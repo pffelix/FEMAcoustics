@@ -67,7 +67,8 @@ k0 = omega /c0; % wave number
 %% Step 2: Compute Elementary matrices and %% Step 3: Assembling (not optimized sparse matrix)
 
 for e = 1:Ne
-   % Step 2: Compute Elementary matrices
+   % Step 2: Compute shape functions for elementary matrices
+   
    elementnodes= zeros(Ne_Nn,N_dim);
    b = zeros(Ne_Nn,1);
    c= zeros(Ne_Nn,1);
@@ -85,26 +86,33 @@ for e = 1:Ne
     c(1) = elementnodes(3,1) - elementnodes(2,1); % x_32
     c(2) = elementnodes(1,1) - elementnodes(3,1); % x_13
     c(3) = elementnodes(2,1) - elementnodes(1,1); % x_21
-
-    area2 = abs(b(1)*c(2) - b(2)*c(1)); % y_23*x_13 - y_31*x_32=a(1)
-    area  = area2 / 2;
+    
+    %Elemental values
+    % Se=(c(3)*b(2)-c(2)*b(3))/2; %  det Jacobi Matrix /2
+    % Hey=1/(imj*omega*mu0)*((y2-y3)*V1+(y3-y1)*V2+(y1-y2)*V3)/(2*Se);
+    % Hex=-1/(imj*omega*mu0)*((x3-x2)*V1+(x1-x3)*V2+(x2-x1)*V3)/(2*Se);
+    
+    J_e_det = abs(b(1)*c(2) - b(2)*c(1)); % y_23*x_13 - y_31*x_32=a(1) % ander Schreibweise det Jacobi Matrix
+    area  = J_e_det / 2;
 
     %=======
 
-    bmat = [b(1),b(2), b(3);
+    J_e = [b(1),b(2), b(3); % correct Jacobi Matrix
           c(1),c(2),c(3)];
 
-    bmat = bmat / area2;
+    J_e = J_e / J_e_det;
 
-    Ke = transpose(bmat)*bmat*area;
+    Ke = transpose(J_e)*J_e*area; % area?
+    
 
     %=======
-
+    N_e = [ b(1)+c(1),b(2)+c(2),b(3)+c(3)]; % shape functions
+    
     Me = [ 2 , 1 , 1 ;
          1 , 2 , 1 ;
          1 , 1 , 2 ];
 
-    Me = k0^2 * Me * area / 12 ; % k0^2=1/c^2
+    Me = 1/c0^2 * Me * area / 12 ; % k0^2=1/c^2
 
     % Me = [ 1 , 0 , 0 ;
          % 0 , 1 , 0 ;
@@ -112,11 +120,14 @@ for e = 1:Ne
 
     % Me = k0^2 * Me * area / 3 ;
     
+    % Shape function 
+
+    
+    % Step 3: Assembling (not optimized sparse matrix)
+
     % Find the equation number list for the i-th element
     lnods=el_no(e,:); % the 3 node numbers at element e
     eqnum = lnods;
-    
-    % Step 3: Assembling (not optimized sparse matrix)
 
     for i = 1 : Ne_Nn
       for j = 1 : Ne_Nn
