@@ -33,7 +33,7 @@ Px1=100;Px2=600;Py1=100;Py2=620;    % Size of figures
 [x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
 L=x_max_bc-x_min_bc; % Length of the room in meter
 W=y_max_bc-y_min_bc; % Width of the room in meter
-piston_node = 50; % dsearchn(nodes,delaunayn(nodes),piston_xy); % closest node to piston point
+piston_node = 600; % dsearchn(nodes,delaunayn(nodes),piston_xy); % closest node to piston point
 
 % S_e_average=L*W/Ne; % Average area of an element
 % approx_average_length_element = sqrt(S_e_average*2);
@@ -112,13 +112,13 @@ for e = 1:Ne
          1 , 2 , 1 ;
          1 , 1 , 2 ];
 
-    Me = 1/c0^2 * Me * area / 12 ; % k0^2=1/c^2
+    Me = k0^2 * Me * area / 12 ; % k0^2=1/c^2
 
-    % Me = [ 1 , 0 , 0 ;
-         % 0 , 1 , 0 ;
-         % 0 , 0 , 1 ];
+    Me = [ 1 , 0 , 0 ;
+         0 , 1 , 0 ;
+         0 , 0 , 1 ];
 
-    % Me = k0^2 * Me * area / 3 ;
+    Me = 1/c0^2 * Me * area / 3 ;
     
     % Shape function 
 
@@ -155,7 +155,7 @@ Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
 Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
 [Bn, Bm] = size(C);
 diagIdx = 1:Bn+1:Bn*Bm;
-C(diagIdx(Boundary_vector) ) = beta/(rho0*c0); %% NN fehlt, *rho, kein c0
+C(diagIdx(Boundary_vector) ) = (1252 -2209i); % beta/(rho0*c0); %% NN fehlt, *rho, kein c0
 
 %% Step 5: Solving the system
 Pquad = zeros(Nn,length(omega));
@@ -164,12 +164,41 @@ n = 1;
 w = omega(n);
 % FE solution
 S = zeros(Nn,1); % Initialize force vector
-S(piston_node) = w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
+S(piston_node) = 10;% w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
+
+T_1= H - w^2*Q;
+histfit(T_1(:),10)
+min(T_1(:))
+max(T_1(:))
 
 A = (H - w^2*Q/(1+1i*air_damp)+1i*w*C);
 b = S;
+test=inv(w^2*Q);
+max(abs(test(:,50)).^2)
+min(abs(test(:,50)).^2)
+size_A=size(A);
+eye_matrix=eye(size_A(1));
+P = A\S; % Solve the system direct
 
-P = (H - w^2*Q/(1+1i*air_damp)+1i*w*C)\S; % Solve the system direct
+
+P=Vc;
+% Pquad_direct(n) = (rho0*c0^2)* real(P'*Q*P)/(2*L); % Compute the space avergaed quadratic pressure
+Pquad(:,n) = abs(P).^2; % Compute the  average quadratic pressure at node n
+% end
+
+if 1 % Field Plot
+V= log10(Pquad); % round((Pquad/min(Pquad)-1)/max((Pquad/min(Pquad)-1))*10000000);
+
+% V2=Field;
+fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+set_figure_1;
+find_min_max;
+field_plot;
+geometry_plot;
+end
+
+
+
 switch solver
             % ***************************
     case 1  % direct sparse matrix solver
@@ -189,34 +218,34 @@ switch solver
         [Vc,flag,relres,iter]=gmres(A,b,[],1e-7,Nn,M1);
 end
 
-P=Vc;
-% Pquad_direct(n) = (rho0*c0^2)* real(P'*Q*P)/(2*L); % Compute the space avergaed quadratic pressure
-Pquad(:,n) = abs(P).^2; % Compute the  average quadratic pressure at node n
+
+
+
+
+
+
+
+
+%% strg r, t
+% if 1 % Geometry Plot
+% figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+% set_figure_1;
+% geometry_plot;
 % end
-
-
-
-
-
-if 1 % Geometry Plot
-figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-geometry_plot;
-end
-
-if 1 % Mesh Plot
-figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-mesh_plot;
-geometry_plot;
-end
-
-if 1 % Boundary Nodes Plot
-figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-geometry_plot;
-plot_boundary_nodes;
-end
+% 
+% if 1 % Mesh Plot
+% figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+% set_figure_1;
+% mesh_plot;
+% geometry_plot;
+% end
+% 
+% if 1 % Boundary Nodes Plot
+% figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+% set_figure_1;
+% geometry_plot;
+% plot_boundary_nodes;
+% end
 
 % Set the field values for testing the field visulaization function
 % xc=0;yc=0;
@@ -224,14 +253,3 @@ end
 % for i=1:Nn
     % Field(i)=sqrt((x_no(i)-xc)^2+(y_no(i)-yc)^2);
 % end
-
-if 1 % Field Plot
-V= Pquad;% round((Pquad/min(Pquad)-1)/max((Pquad/min(Pquad)-1))*10000000);
-% V2=Field;
-fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-find_min_max;
-field_plot;
-geometry_plot;
-end
-

@@ -15,7 +15,7 @@ for i=1:Nl
    field_lines(i)=min_field+(i-1)*delta_field; 
 end
 
-field_lines=logspace(floor(log10(min_field)),ceil(log10(max_field)),Nl);
+% field_lines=logspace(floor(log10(min_field)),ceil(log10(max_field)),Nl);
 
 % Loop over elements
 for i=1:Ne

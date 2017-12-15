@@ -92,27 +92,27 @@ for e = 1:Ne
     % Hey=1/(imj*omega*mu0)*((y2-y3)*V1+(y3-y1)*V2+(y1-y2)*V3)/(2*Se);
     % Hex=-1/(imj*omega*mu0)*((x3-x2)*V1+(x1-x3)*V2+(x2-x1)*V3)/(2*Se);
     
-    area2 = abs(b(1)*c(2) - b(2)*c(1)); % y_23*x_13 - y_31*x_32=a(1) % ander Schreibweise det Jacobi Matrix
-    area  = area2 / 2;
+    J_e_det = abs(b(1)*c(2) - b(2)*c(1)); % y_23*x_13 - y_31*x_32=a(1) % ander Schreibweise det Jacobi Matrix
+    area  = J_e_det / 2;
 
     %=======
 
     J_e = [b(1),b(2), b(3); % correct Jacobi Matrix
           c(1),c(2),c(3)];
 
-    J_e = J_e / area2;
+    J_e = J_e / J_e_det;
 
-    Ke = transpose(J_e)*J_e*area; % area2?
+    Ke = transpose(J_e)*J_e*area; % area?
     
 
     %=======
-    N_e = [ b(1)+c(1),b(2)+c(2),b(3)+c(3)
+    N_e = [ b(1)+c(1),b(2)+c(2),b(3)+c(3)]; % shape functions
     
     Me = [ 2 , 1 , 1 ;
          1 , 2 , 1 ;
          1 , 1 , 2 ];
 
-    Me = 1/c0^2 * Me * area / 12 ; % k0^2=1/c^2
+    Me = k0^2 * Me * area / 12 ; % k0^2=1/c^2
 
     % Me = [ 1 , 0 , 0 ;
          % 0 , 1 , 0 ;
@@ -155,7 +155,7 @@ Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
 Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
 [Bn, Bm] = size(C);
 diagIdx = 1:Bn+1:Bn*Bm;
-C(diagIdx(Boundary_vector) ) = beta/(rho0*c0); %% NN fehlt, *rho, kein c0
+C(diagIdx(Boundary_vector) ) = (1252 -2209i); % beta/(rho0*c0); %% NN fehlt, *rho, kein c0
 
 %% Step 5: Solving the system
 Pquad = zeros(Nn,length(omega));
@@ -164,12 +164,35 @@ n = 1;
 w = omega(n);
 % FE solution
 S = zeros(Nn,1); % Initialize force vector
-S(piston_node) = w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
+S(piston_node) = 10;% w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
 
 A = (H - w^2*Q/(1+1i*air_damp)+1i*w*C);
 b = S;
+test=inv(Q);
+max(abs(test(:,50)).^2)
+min(abs(test(:,50)).^2)
+size_A=size(A);
+eye_matrix=eye(size_A(1));
+P = A\S; % Solve the system direct
 
-P = (H - w^2*Q/(1+1i*air_damp)+1i*w*C)\S; % Solve the system direct
+P=Vc;
+% Pquad_direct(n) = (rho0*c0^2)* real(P'*Q*P)/(2*L); % Compute the space avergaed quadratic pressure
+Pquad(:,n) = abs(P).^2; % Compute the  average quadratic pressure at node n
+% end
+
+if 1 % Field Plot
+V= log10(Pquad); % round((Pquad/min(Pquad)-1)/max((Pquad/min(Pquad)-1))*10000000);
+
+% V2=Field;
+fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+set_figure_1;
+find_min_max;
+field_plot;
+geometry_plot;
+end
+
+
+
 switch solver
             % ***************************
     case 1  % direct sparse matrix solver
@@ -189,34 +212,34 @@ switch solver
         [Vc,flag,relres,iter]=gmres(A,b,[],1e-7,Nn,M1);
 end
 
-P=Vc;
-% Pquad_direct(n) = (rho0*c0^2)* real(P'*Q*P)/(2*L); % Compute the space avergaed quadratic pressure
-Pquad(:,n) = abs(P).^2; % Compute the  average quadratic pressure at node n
+
+
+
+
+
+
+
+
+%% strg r, t
+% if 1 % Geometry Plot
+% figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+% set_figure_1;
+% geometry_plot;
 % end
-
-
-
-
-
-if 1 % Geometry Plot
-figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-geometry_plot;
-end
-
-if 1 % Mesh Plot
-figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-mesh_plot;
-geometry_plot;
-end
-
-if 1 % Boundary Nodes Plot
-figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-geometry_plot;
-plot_boundary_nodes;
-end
+% 
+% if 1 % Mesh Plot
+% figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+% set_figure_1;
+% mesh_plot;
+% geometry_plot;
+% end
+% 
+% if 1 % Boundary Nodes Plot
+% figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+% set_figure_1;
+% geometry_plot;
+% plot_boundary_nodes;
+% end
 
 % Set the field values for testing the field visulaization function
 % xc=0;yc=0;
@@ -224,14 +247,3 @@ end
 % for i=1:Nn
     % Field(i)=sqrt((x_no(i)-xc)^2+(y_no(i)-yc)^2);
 % end
-
-if 1 % Field Plot
-V= Pquad;% round((Pquad/min(Pquad)-1)/max((Pquad/min(Pquad)-1))*10000000);
-% V2=Field;
-fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-find_min_max;
-field_plot;
-geometry_plot;
-end
-
