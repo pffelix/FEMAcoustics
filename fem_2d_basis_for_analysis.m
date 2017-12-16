@@ -256,8 +256,6 @@ end
 
 
 
-
-
 %% strg r, t
 % if 1 % Geometry Plot
 % figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
