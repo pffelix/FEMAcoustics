@@ -7,6 +7,9 @@ load elements.txt;
 load domains.txt;
 load bcs.txt;
 
+% x= 3.93
+% 470,512,513
+
 [Nn m]=size(nodes);
 [Ne m]=size(elements);
 [Nb m]=size(bcs);

@@ -19,7 +19,7 @@ air_damp = 0.00; % Damping by the cavity air
 Z = 2055-4678i; % % Wall impedance defined as pressure at wall divided by particle velocity Z=p/v
 freq = 100; % Frequency of loudspeaker excitation
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-piston_xy = [0.1,2]; %  Piston source position node
+piston_xy = [3,3]; %  Piston source position node
 solver=1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
 
 % *************************************************************************
@@ -33,7 +33,19 @@ Px1=100;Px2=600;Py1=100;Py2=620;    % Size of figures
 [x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
 L=x_max_bc-x_min_bc; % Length of the room in meter
 W=y_max_bc-y_min_bc; % Width of the room in meter
-piston_node = 600; % dsearchn(nodes,delaunayn(nodes),piston_xy); % closest node to piston point
+
+% make room without interior objects
+% bc_elements_compelete=bc_elements;
+% bc_inside_index =unique([find(nodes(:,1)==0); find(nodes(:,2)==0)]); % find alle node indexes which have x or y == 0
+% bc_elements=bc_elements(unique([find(ismember(bc_elements(:,2),bc_inside_index)==1); find(ismember(bc_elements(:,1),bc_inside_index)==1)]),:); % only store nodes with this indexes in bc_elements
+
+nodes_no_bc_index=zeros(Nn,1); % index vector with positions of all non boundary nodes
+nodes_no_bc_index(:,1)=linspace(1,Nn,Nn);
+nodes_no_bc_index(unique(bc_elements),:) = [];
+
+piston_node = nodes_no_bc_index(dsearchn(nodes(nodes_no_bc_index,:),delaunayn(nodes(nodes_no_bc_index,:)),piston_xy)); % calculate closest node to piston point
+% piston_node = 50; % dsearchn(nodes,delaunayn(nodes),piston_xy); 
+
 
 % S_e_average=L*W/Ne; % Average area of an element
 % approx_average_length_element = sqrt(S_e_average*2);
@@ -94,7 +106,6 @@ for e = 1:Ne
     
     J_e_det = abs(b(1)*c(2) - b(2)*c(1)); % y_23*x_13 - y_31*x_32=a(1) % ander Schreibweise det Jacobi Matrix
     area  = J_e_det / 2;
-
     %=======
 
     J_e = [b(1),b(2), b(3); % correct Jacobi Matrix
@@ -113,12 +124,12 @@ for e = 1:Ne
          1 , 1 , 2 ];
 
     Me = k0^2 * Me * area / 12 ; % k0^2=1/c^2
-
+    % Me = Ke;
     Me = [ 1 , 0 , 0 ;
          0 , 1 , 0 ;
          0 , 0 , 1 ];
 
-    Me = 1/c0^2 * Me * area / 3 ;
+    Me = k0^2 * Me * area / 3 ;
     
     % Shape function 
 
@@ -164,7 +175,7 @@ n = 1;
 w = omega(n);
 % FE solution
 S = zeros(Nn,1); % Initialize force vector
-S(piston_node) = 10;% w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
+S(piston_node) = 100;% w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
 
 T_1= H - w^2*Q;
 histfit(T_1(:),10)
@@ -181,9 +192,9 @@ eye_matrix=eye(size_A(1));
 P = A\S; % Solve the system direct
 
 
-P=Vc;
+% P=Vc;
 % Pquad_direct(n) = (rho0*c0^2)* real(P'*Q*P)/(2*L); % Compute the space avergaed quadratic pressure
-Pquad(:,n) = abs(P).^2; % Compute the  average quadratic pressure at node n
+Pquad = abs(P); % Compute the  average quadratic pressure at node n
 % end
 
 if 1 % Field Plot
