@@ -21,7 +21,7 @@ rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
 air_damp = 0.00; % Damping by the cavity air
 Z = 2055-4678i; % % Wall impedance defined as pressure at wall divided by particle velocity Z=p/v
-freq = 500; % Frequency of piston excitation in Hz (should be maximum 500 Hz otherwise less then 6 elements per wavelength)
+freq = 90; % Frequency of piston excitation in Hz (should be maximum 500 Hz otherwise less then 6 elements per wavelength)
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
 piston_xy = [0.55,2]; %  Piston position x and y (original position source [0.55,2])
 
@@ -157,6 +157,7 @@ for e = 1:Ne
     % Step 3: Assembling (not optimized sparse matrix)
 
     % Find the equation number list for the i-th element
+    
     eqnum = el_no(e,:); % the 3 node numbers at element e
 
     for i = 1 : Ne_Nn
@@ -165,12 +166,15 @@ for e = 1:Ne
         M(eqnum(i),eqnum(j)) = M(eqnum(i),eqnum(j)) + Me(i,j);
       end
     end
+    
+
     LM=zeros(Ne_Nn,Nn);
     for e_n= 1:Ne_Nn
         % LM(e_n,2*ie-1:2*ie+1)=1;
         node_number = el_no(e,e_n);
         LM(e_n,node_number) = 1;
     end
+    
     
     % H = H + sparse(LM'*Ke*LM); % K Stiffness Matrix
     % Q = Q + sparse(LM'*Me*LM); % M Mass Matrix
@@ -213,12 +217,10 @@ P = A\F; % Solve the system direct
 
 % P=Vc;
 % Pquad_direct(n) = (rho0*c0^2)* real(P'*Q*P)/(2*L); % Compute the space avergaed quadratic pressure
-Pquad = abs(P).^2; % Compute the  average quadratic pressure at node n
+Pquad = abs(P).^2; % squared sound pressure
 % end
-
 if 1 % Field Plot
-V= log10(Pquad); % round((Pquad/min(Pquad)-1)/max((Pquad/min(Pquad)-1))*10000000);
-
+V= log10(Pquad)-max(log10(Pquad)); %  normalized squared sound pressure in dB
 % V2=Field;
 fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
 set_figure_1;
