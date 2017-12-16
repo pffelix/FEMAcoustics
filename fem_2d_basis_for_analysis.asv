@@ -7,12 +7,10 @@
 load_data;
 
 % to do:
-% 2D: Präsi: hohe f, niedrige f vergleichen, andere Impedanz Wand, andere
-%     Quellen position, rechteckram ohne boundaries, raummoden zeigen
-%     Probleme: wieso läuft durch boundary, el_mat, domains, H-Q ersetzen
-%     einheitlich, Solver integrieren (+ander TEchnik Highlights)
-% 1D: pressure über x zeigen und pressure über f, Z variieren
-
+% el_mat , domains, wieso läuft durch boundary, rechteckram ohne boundary,
+% H-Q ersetzen einheitlich, Solver integrieren, Raum Absorption variieren,
+% 1D pressure über x zeigen und pressure über f, raummoden zeigen
+% plots präsentation
 %% 
 %==================================================================
 % Parameters definition
@@ -26,36 +24,6 @@ solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
 piston_xy = [0.55,2]; %  Piston position x and y (original position source [0.55,2])
 
 % *************************************************************************
-%% Acoustical properties calucation
-
-% Boundary
-Z0 = rho0 * c0; % Calculate impedance of air
-if (Z~=0), beta= 1/Z; else beta=1e6; end % Calculate wall admittance
-
-% Excitation
-omega=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
-lamda = c0/freq; % Calculate wave length of loudspeaker excitation frequency
-lamda_min= c0/max(freq); % Smallest wavelength in the room
-k0 = omega /c0; % wave number
-
-% Room modes
-[x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
-L=x_max_bc-x_min_bc; % Length of the room in meter
-W=y_max_bc-y_min_bc; % Width of the room in meter
-
-n_modes=100;
-f_ax_mode=zeros(10,1);
-f_ay_mode=zeros(10,1);
-f_tan_mode=zeros(10,10);
-
-for i=linspace(1,n_modes)
-    f_ax_mode(i)=c0/2*sqrt((i/L)^2);
-    f_ay_mode(i)=c0/2*sqrt((i/W)^2);
-    for j = linspace(1,n_modes)
-        f_tan_mode(i,j)=c0/2*sqrt((i/L)^2+(j/W)^2);
-    end
-end
-        
 
 %% Step 1: Set up Mesh
 
@@ -63,6 +31,9 @@ end
 [~, Ne_Nn] = size(elements);
 [~, N_dim] = size(nodes);
 Px1=100;Px2=600;Py1=100;Py2=620;    % Size of figures
+[x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
+L=x_max_bc-x_min_bc; % Length of the room in meter
+W=y_max_bc-y_min_bc; % Width of the room in meter
 
 % make room without interior objects
 % bc_elements_compelete=bc_elements;
@@ -92,6 +63,35 @@ force = complex( zeros(Nn,1) , zeros(Nn,1) ); % Force vector
 % Q = sparse(Nn,Nn); % Mass Matrix
 H = zeros(Nn,Nn); % Stiffness Matrix (rigidity)
 Q = zeros(Nn,Nn); % Mass Matrix
+
+
+
+%% Acoustical properties calucation
+
+% Boundary
+Z0 = rho0 * c0; % Calculate impedance of air
+if (Z~=0), beta= 1/Z; else beta=1e6; end % Calculate wall admittance
+
+% Excitation
+omega=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
+lamda = c0/freq; % Calculate wave length of loudspeaker excitation frequency
+% lamda_min= c0/max(freq); % Smallest wavelength in the room
+k0 = omega /c0; % wave number
+
+% Room modes
+n_modes=100;
+f_ax_mode=zeros(10,1);
+f_ay_mode=zeros(10,1);
+f_tan_mode=zeros(10,10);
+
+for i=linspace(1,n_modes)
+    f_ax_mode(i)=c0/2*sqrt((i/L)^2);
+    f_ay_mode(i)=c0/2*sqrt((i/W)^2);
+    for j = linspace(1,n_modes)
+        f_tan_mode(i,j)=c0/2*sqrt((i/L)^2+(j/W)^2);
+    end
+end
+        
 
 
 
@@ -193,8 +193,8 @@ Pquad = zeros(Nn,length(omega));
 n = 1;
 w = omega(n);
 % FE solution
-F = zeros(Nn,1); % Initialize force vector
-F(piston_node) = w^2;% w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
+S = zeros(Nn,1); % Initialize force vector
+S(piston_node) = w^2;% w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
 
 T_1= H - w^2*Q;
 histfit(T_1(:),10)
@@ -202,13 +202,13 @@ min(T_1(:))
 max(T_1(:))
 
 A = H/rho0 - w^2*Q/((rho0*c0^2)*(1+1i*air_damp))+1i*w*C/(rho0*c0); % (H - w^2*Q/(1+1i*air_damp)+1i*w*C);
-b = F;
+b = S;
 test=inv(w^2*Q);
 max(abs(test(:,50)).^2)
 min(abs(test(:,50)).^2)
 size_A=size(A);
 eye_matrix=eye(size_A(1));
-P = A\F; % Solve the system direct
+P = A\S; % Solve the system direct
 
 
 % P=Vc;

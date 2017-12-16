@@ -82,7 +82,7 @@ for n=1:length(omega)
     w=omega(n);
     F=zeros(Nn,1); % Force vector
     F(piston_node) = w^2; % at piston position * rho0*co^2 (dividee whole P by it)
-    A_solve = (K/rho0 - w^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w*C/(rho0*c0));
+    A_solve = K/rho0 - w^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w*C/(rho0*c0);
     P = A_solve\F; % Solve the system to get pressure in tube
     Pquad_direct(n) = (rho0*c0^2)* real(P'*M*P)/(2*L)/(rho0*c0^2); % space avergaed quadratic pressure /(rho0*c0^2) because of M
     
