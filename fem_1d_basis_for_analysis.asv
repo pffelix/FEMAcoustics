@@ -17,14 +17,14 @@ U0=1; % Piston displacement
 % Parameters definition
 % **************************************************************
 L=1; % Length of the tube
-piston_x = 1; % Piston x position 
-boundary_x = 0; % Wall boundary x position 
+piston_x = 0; % Piston x position 
+boundary_x = 1; % Wall boundary x position 
 freq = [10:2:1000]; % Frequency of piston excitation
 Z = 2055-4678i; % % Wall impedance defined as pressure at wall divided by particle velocity Z=p/v
 air_damp = 0.00; % Damping of the cavity air
 rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
-shape_type = 2; % 1 - linear shape functions; 2 - quadratic shape functions 
+shape_type = 1; % 1 - linear shape functions; 2 - quadratic shape functions 
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
 % *************************************************************************
 
@@ -73,21 +73,21 @@ end
     
 %% Step 4: Impedance condition (damping by wall)
 C = zeros(Nn,Nn);
-C(boundary_node,boundary_node) = beta;
+C(boundary_x,boundary_x) = beta/(rho0*c0);
 %% Step 5: Solving the system with the Force vector : Piston at a x=L
 Pquad_direct=zeros(1,Nn);
 Pquad_modal=zeros(1,Nn);
 Pquad_exact=zeros(1,Nn);
 for n=1:length(omega)
     w=omega(n);
-    F=zeros(Nn,1); % Force vector
-    F(piston_node) = w^2; % at piston position * rho0*co^2 (dividee whole P by it)
-    A_solve = (K/rho0 - w^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w*C/(rho0*c0));
-    P = A_solve\F; % Solve the system to get pressure in tube
-    Pquad_direct(n) = (rho0*c0^2)* real(P'*M*P)/(2*L)/(rho0*c0^2); % space avergaed quadratic pressure /(rho0*c0^2) because of M
+    F=zeros(Nn); % Force vector
+    F(piston_node) = w^2; % at piston position * rho0*co^2 (dive whole P by it)
+    A = (K/rho0 - w^2*M/((rho0*c0^2)*(1+1i*neta_a))+1i*w*C);
+    P = \F; % Solve the system to get pressure in tube
+    Pquad_direct(n) = (rho0*c0^2)* real(P'*M*P)/(2*L); % Compute the space avergaed quadratic pressure
     
     % Analytical solution
-    k0=w/c0/sqrt(1+1i*air_damp);
+    k0=w/c0/sqrt(1+1i*neta_a);
     r=(Z-1)/(Z+1);
     a=(1j*w*U0)*Z0/(exp(1j*k0*L)-r*exp(-1j*k0*L));
     x=[0:L/100:L]; p=a*(exp(-1i*k0*x)+r*exp(1i*k0*x));

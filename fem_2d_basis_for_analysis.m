@@ -9,7 +9,7 @@ load_data;
 % to do:
 % el_mat , domains
 % A wieso complex
-%%
+%% 
 %==================================================================
 % Parameters definition
 % **************************************************************
@@ -17,12 +17,22 @@ rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
 air_damp = 0.00; % Damping by the cavity air
 Z = 2055-4678i; % % Wall impedance defined as pressure at wall divided by particle velocity Z=p/v
-freq = 100; % Frequency of loudspeaker excitation
+freq = 100; % Frequency of piston excitation
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-piston_xy = [3,3]; %  Piston source position node
-solver=1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
+piston_xy = [3,3]; %  Piston position x and y
 
 % *************************************************************************
+%% Acoustical properties calucation
+
+% Boundary
+Z0 = rho0 * c0; % Calculate impedance of air
+if (Z~=0), beta= 1/Z; else beta=1e6; end % Calculate wall admittance
+
+% Excitation
+omega=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
+lamda = c0/freq; % Calculate wave length of loudspeaker excitation frequency
+% lamda_min= c0/max(freq); % Smallest wavelength in the room
+k0 = omega /c0; % wave number
 
 %% Step 1: Set up Mesh
 
@@ -65,16 +75,6 @@ Q = zeros(Nn,Nn); % Mass Matrix
 
 
 
-%% Acoustical parameter calucation
-% Boundary
-Z0 = rho0 * c0; % Calculate impedance of air
-if (Z~=0), beta= 1/Z; else beta=1e6; end % Calculate wall admittance
-
-% Excitation
-omega=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
-lamda = c0/freq; % Calculate wave length of loudspeaker excitation frequency
-lamda_min= c0/max(freq); % Smallest wavelength in the room
-k0 = omega /c0; % wave number
 
 %% Step 2: Compute Elementary matrices and %% Step 3: Assembling (not optimized sparse matrix)
 
@@ -137,8 +137,7 @@ for e = 1:Ne
     % Step 3: Assembling (not optimized sparse matrix)
 
     % Find the equation number list for the i-th element
-    lnods=el_no(e,:); % the 3 node numbers at element e
-    eqnum = lnods;
+    eqnum = el_no(e,:); % the 3 node numbers at element e
 
     for i = 1 : Ne_Nn
       for j = 1 : Ne_Nn
