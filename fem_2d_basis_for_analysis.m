@@ -7,8 +7,10 @@
 load_data;
 
 % to do:
-% 2D: Präsi: hohe f, niedrige f vergleichen, andere Impedanz Wand, andere
-%     Quellen position, rechteckram ohne boundaries, raummoden zeigen
+% 2D: Präsi: hohe f, niedrige f vergleichen, hohe und niedrige Impedanz Wand, andere
+%     Quellen position, rechteckram ohne boundaries, raummoden zeigen, Z->0
+%     (freifeld, sommerfeld ansprechen),Time componten einbauen (moden
+%     schwingung zeigen)
 %     Probleme: wieso läuft durch boundary, el_mat, domains, H-Q ersetzen
 %     einheitlich, Solver integrieren (+ander TEchnik Highlights)
 % 1D: pressure über x zeigen und pressure über f, Z variieren
@@ -20,10 +22,10 @@ load_data;
 rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
 air_damp = 0.00; % Damping by the cavity air
-Z = 2055-4678i; % % Wall impedance defined as pressure at wall divided by particle velocity Z=p/v
+Z = 0.00001; % % Wall impedance defined as pressure at wall divided by particle velocity Z=p/v
 freq = 90; % Frequency of piston excitation in Hz (should be maximum 500 Hz otherwise less then 6 elements per wavelength)
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-piston_xy = [0.55,2]; %  Piston position x and y (original position source [0.55,2])
+piston_xy = [0.55,1.95]; %  Piston position x and y (original position source [0.55,2])
 
 % *************************************************************************
 %% Acoustical properties calucation
