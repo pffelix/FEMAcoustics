@@ -7,6 +7,14 @@ load elements.txt;
 load domains.txt;
 load bcs.txt;
 
+% remove boundary object inside of piston casing
+nodes_bc_index = unique(bcs)+1;
+nodes_bc_xy = nodes(nodes_bc_index,:);
+nodes_bc_piston_casing_inside = nodes_bc_index(find(nodes_bc_xy(:,1)>=0.5 & nodes_bc_xy(:,1)<=0.6  & nodes_bc_xy(:,2)>=1.9 & nodes_bc_xy(:,2)<=2.1));
+affected_bc_elements=ismember(bcs+1,nodes_bc_piston_casing_inside);
+affected_bc_elements_nr=or(affected_bc_elements(:,1),affected_bc_elements(:,2));
+bcs(affected_bc_elements_nr,:)=[];
+
 [Nn m]=size(nodes);
 [Ne m]=size(elements);
 [Nb m]=size(bcs);

@@ -222,7 +222,8 @@ for nw=1:length(w)
     % Add global stiffness, mass and boundary matrix to one matrix 
     % representing the left side of the weak form of the Helmholtz equation
     A = K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w_n*C/(rho0*c0);
-
+    A_mod=b-(K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp)))*Vc';
+    C_new=A_mod/Vc;
     switch solver
             % ***************************
     case 1  % direct sparse matrix solver
