@@ -67,7 +67,7 @@ if(elements_per_lamda_min<6)
 end
         
 
-%% Step 1: Set up mesh
+%% Step 1: Set up Mesh
 
 % Mesh paramater calculation
 [~, Ne_Nn] = size(elements); % number of nodes at each element
@@ -163,15 +163,16 @@ for e = 1:Ne
     M = M + LM'*Me*LM; % M Mass Matrix
  end
 
-%% Integrate impedance condition at boundaries
+%% Impedance condition boundaries
+% B = sparse(Nn,Nn);
 C = zeros(Nn,Nn);
 Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
 Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
 [Bn, Bm] = size(C);
 diagIdx = 1:Bn+1:Bn*Bm;
-C(diagIdx(Boundary_vector) ) = beta;
+C(diagIdx(Boundary_vector) ) = beta; % beta/(rho0*c0); %% NN fehlt, *rho, kein c0
 
-%% Solving the system
+%% Step 5: Solving the system
 Pquad = zeros(Nn,length(omega));
 % for n=1:length(omega)
 n = 1;
