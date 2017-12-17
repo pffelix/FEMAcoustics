@@ -7,10 +7,10 @@
 load_data;
 
 % to do:
-% 2D: Präsi: hohe f, niedrige f vergleichen, hohe und niedrige Impedanz Wand, andere
+% 2D: Präsi: hohe f, niedrige f vergleichen (extreme druckunterschiede), hohe und niedrige Impedanz Wand, andere
 %     Quellen position, rechteckram ohne boundaries, raummoden zeigen, Z->0
 %     (freifeld, sommerfeld ansprechen),Time componten einbauen (moden
-%     schwingung zeigen)
+%     schwingung zeigen), optimize performance ansprechen
 %     Probleme: wieso läuft durch boundary, el_mat, domains, H-Q ersetzen
 %     einheitlich, Solver integrieren (+ander TEchnik Highlights)
 % 1D: pressure über x zeigen und pressure über f, Z variieren
@@ -23,9 +23,9 @@ rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
 air_damp = 0.00; % Damping by the cavity air
 Z = 100; % % Wall impedance defined as pressure at wall divided by particle velocity Z=p/v
-freq = 90; % Frequency of piston excitation in Hz (should be maximum 500 Hz otherwise less then 6 elements per wavelength)
+freq = 500; % Frequency of piston excitation in Hz (should be maximum 500 Hz otherwise less then 6 elements per wavelength)
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-piston_xy = [0.55,1.95]; %  Piston position x and y (original position source [0.55,2])
+piston_xy = [0.55,2]; %  Piston position x and y (original position source [0.55,2])
 
 % *************************************************************************
 %% Acoustical properties calucation
@@ -35,10 +35,10 @@ Z0 = rho0 * c0; % Calculate impedance of air
 if (Z~=0), beta= 1/Z; else beta=1e6; end % Calculate wall admittance
 
 % Excitation
-omega=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
+w=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
 lamda = c0/freq; % Calculate wave length of loudspeaker excitation frequency
 lamda_min= c0/max(freq); % Smallest wavelength in the room
-k0 = omega /c0; % wave number
+k0 = w /c0; % wave number
 
 % Room modes
 [x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
@@ -58,14 +58,13 @@ for i=linspace(1,n_modes)
     end
 end
 
-% Approximated umber of elements per wavelength 
+% Approximated number of elements per wavelength 
 S_e_average=L*W/Ne; % Average area of an element (rough approximation)
 approx_average_length_element = sqrt(S_e_average*2);
 elements_per_lamda_min= lamda_min/ approx_average_length_element;
 if(elements_per_lamda_min<6)
     fprintf('frequency to high for element number');
 end
-        
 
 %% Step 1: Set up mesh
 
@@ -74,13 +73,7 @@ end
 [~, N_dim] = size(nodes); % dimension (here x,y = 2)
 Px1=100;Px2=600;Py1=100;Py2=620; % Size of figures
 K = sparse( Nn , Nn ); % Gobal stiffness matrix
-% C = sparse( Nn , Nn ); % Global damping matrix
 M = sparse( Nn , Nn ); % Global mass matrix
-force = complex( zeros(Nn,1) , zeros(Nn,1) ); % Force vector
-% H = sparse(Nn,Nn); % Stiffness Matrix
-% Q = sparse(Nn,Nn); % Mass Matrix
-K = zeros(Nn,Nn); % Stiffness Matrix (rigidity)
-M = zeros(Nn,Nn); % Mass Matrix
 
 % Get index of all non boundary nodes
 nodes_no_bc_index=zeros(Nn,1);
@@ -99,30 +92,30 @@ piston_node = nodes_no_bc_index(dsearchn(nodes(nodes_no_bc_index,:),delaunayn(no
 % bc_inside_index =unique([find(nodes(:,1)==0); find(nodes(:,2)==0)]); % find alle node indexes which have x or y == 0
 % bc_elements=bc_elements(unique([find(ismember(bc_elements(:,2),bc_inside_index)==1); find(ismember(bc_elements(:,1),bc_inside_index)==1)]),:); % only store nodes with this indexes in bc_elements
 
-
-%% Compute Elementary matrices and assembling of stiffness and sparse matrix
-
+%% Build stiffness and mass matrix
+fprintf('Assemble stiffness and mass matrix: \n');
+tic
 for e = 1:Ne
-   % Calculate shape functions for linear triangular with 3 nodes 
-   
-   % global positions of current element nodes
-   elementnodes= zeros(Ne_Nn,N_dim);
-   b = zeros(Ne_Nn,1);
-   c= zeros(Ne_Nn,1);
-   for e_n = 1:Ne_Nn
-       elementnodes(e_n,:)= nodes(el_no(e,e_n),:);
-   end
-
+    %% Compute elementary stiffness and mass matrices
+    % shape functions for linear triangular with 3 nodes 
+    % Get global x y position of all nodes of element
+    e_n_xy = zeros(Ne_Nn,N_dim);
+    b = zeros(Ne_Nn,1);
+    c= zeros(Ne_Nn,1);
+    for e_n = 1:Ne_Nn
+       e_n_xy(e_n,:)= nodes(el_no(e,e_n),:);
+    end
+    
     %  y local coordinates
-    b(1) = elementnodes(2,2) - elementnodes(3,2); % y_23
-    b(2) = elementnodes(3,2) - elementnodes(1,2); % y_31
-    b(3) = elementnodes(1,2) - elementnodes(2,2); % y_12
+    b(1) = e_n_xy(2,2) - e_n_xy(3,2); % y_23
+    b(2) = e_n_xy(3,2) - e_n_xy(1,2); % y_31
+    b(3) = e_n_xy(1,2) - e_n_xy(2,2); % y_12
 
     % x local coordinates
-    c(1) = elementnodes(3,1) - elementnodes(2,1); % x_32
-    c(2) = elementnodes(1,1) - elementnodes(3,1); % x_13
-    c(3) = elementnodes(2,1) - elementnodes(1,1); % x_21
-    
+    c(1) = e_n_xy(3,1) - e_n_xy(2,1); % x_32
+    c(2) = e_n_xy(1,1) - e_n_xy(3,1); % x_13
+    c(3) = e_n_xy(2,1) - e_n_xy(1,1); % x_21
+
     % area of triangular element
     area2 = abs(b(1)*c(2) - b(2)*c(1)); % y_23*x_13 - y_31*x_32
     area  = area2 / 2;
@@ -131,13 +124,13 @@ for e = 1:Ne
     B = [b(1),b(2), b(3);
           c(1),c(2),c(3)];
     B = B / area2;
-    Ke = transpose(B)*B*area;
-    
+    Ke = sparse(transpose(B)*B*area);
+
     % elementary mass matrix
     Me = [ 2 , 1 , 1 ;
          1 , 2 , 1 ;
          1 , 1 , 2 ];
-    Me = Me * area / 12 ;
+    Me = sparse(Me * area / 12);
     
     % Me = [ 1 , 0 , 0 ;
            % 0 , 1 , 0 ;
@@ -152,66 +145,49 @@ for e = 1:Ne
       % end
     % end
 
-    % get positions where to assemble in global stiffness and mass matrix 
-    LM=zeros(Ne_Nn,Nn);
+    
+    %% Assemble global stiffness and mass matrix 
+    
+    % positions where to assemble
+    LM=sparse(Ne_Nn,Nn);
     for e_n= 1:Ne_Nn
         node_number = el_no(e,e_n);
         LM(e_n,node_number) = 1;
     end
     
+    % assembling
     K = K + LM'*Ke*LM; % K Stiffness Matrix
     M = M + LM'*Me*LM; % M Mass Matrix
- end
-
-%% Integrate impedance condition at boundaries
-C = zeros(Nn,Nn);
-Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
-Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
-[Bn, Bm] = size(C);
-diagIdx = 1:Bn+1:Bn*Bm;
-C(diagIdx(Boundary_vector) ) = beta;
-
-%% Solving the system
-Pquad = zeros(Nn,length(omega));
-% for n=1:length(omega)
-n = 1;
-w = omega(n);
-% FE solution
-F = zeros(Nn,1); % Initialize force vector
-F(piston_node) = w^2;% w^2; % U0 displacement of the piston fixed to 1 %% N fehlt, 1i fehlt
-
-T_1= K - w^2*M;
-histfit(T_1(:),10)
-min(T_1(:))
-max(T_1(:))
-
-A = K/rho0 - w^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w*C/(rho0*c0); % (H - w^2*Q/(1+1i*air_damp)+1i*w*C);
-b = F;
-test=inv(w^2*M);
-max(abs(test(:,50)).^2)
-min(abs(test(:,50)).^2)
-size_A=size(A);
-eye_matrix=eye(size_A(1));
-P = A\F; % Solve the system direct
-
-
-% P=Vc;
-% Pquad_direct(n) = (rho0*c0^2)* real(P'*Q*P)/(2*L); % Compute the space avergaed quadratic pressure
-Pquad = abs(P).^2; % squared sound pressure
-% end
-if 1 % Field Plot
-V= log10(Pquad)-max(log10(Pquad)); %  normalized squared sound pressure in dB
-% V2=Field;
-fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-find_min_max;
-field_plot;
-geometry_plot;
 end
+toc
 
+%% Solving the FEM system to get sound pressure in room
+fprintf('Integrate boundaries and force vector and solve weak form for every frequency: \n');
+tic
 
+V = zeros(Nn,length(w));  % normalized squared sound pressure in dB
+for nw=1:length(w)
+    
+    % Get current angular frequency
+    w_n = w(nw);
+    
+    % integrate impedance conditions for frequency into damping matrix
+    C = sparse(Nn,Nn);
+    Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
+    Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
+    [Bn, Bm] = size(C);
+    diagIdx = 1:Bn+1:Bn*Bm;
+    C(diagIdx(Boundary_vector) ) = beta;
 
-switch solver
+    % Build force vector for frequency
+    b = sparse(Nn,1); 
+    b(piston_node) = w_n^2;
+
+    % Add global stiffness, mass and boundary matrix to one matrix 
+    % representing the left side of the weak form of the Helmholtz equation
+    A = K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w_n*C/(rho0*c0);
+    
+    switch solver
             % ***************************
     case 1  % direct sparse matrix solver
             % ***************************
@@ -223,19 +199,31 @@ switch solver
     case 2  % GMRES iterative solver
             % **********************
         M1=sparse(Nn,Nn);
-        M=diag(A);
+        diag_A=diag(A);
         for p=1:Nn
-           M1(p,p)=M(p); 
+           M1(p,p)=diag_A(p); 
         end
         [Vc,flag,relres,iter]=gmres(A,b,[],1e-7,Nn,M1);
+    end    
+    P_magnitude = abs(Vc); % sound pressure magnitude
+    L_P_dB = 20*log10(P_magnitude/max(P_magnitude)); % normalized squared sound pressure level in dB
+    V(:,nw)=L_P_dB;
+end
+toc
+%% Plot field
+fprintf('Plot field: \n');
+tic
+
+if 1 % Field Plot
+% V2=Field;
+fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+set_figure_1;
+find_min_max;
+field_plot;
+geometry_plot;
 end
 
-
-
-
-
-
-
+toc
 %% strg r, t
 % if 1 % Geometry Plot
 % figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);

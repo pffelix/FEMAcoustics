@@ -18,8 +18,8 @@ end
 % field_lines=logspace(floor(log10(min_field)),ceil(log10(max_field)),Nl);
 
 % Loop over elements
-for i=1:Ne
 
+for i=1:Ne
     % Field values of nodes
     V1=V(el_no(i,1));
     V2=V(el_no(i,2));
@@ -60,7 +60,7 @@ for i=1:Ne
         in2=3;
         in3=1;
     end
-
+    
     V1=V(el_no(i,in1)); % lowest field value
     V2=V(el_no(i,in2));
     V3=V(el_no(i,in3)); % highest field values
