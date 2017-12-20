@@ -9,52 +9,84 @@ load_data;
 % to do:
 % 2D: Präsi: hohe f, niedrige f vergleichen (extreme druckunterschiede), hohe und niedrige Impedanz Wand, andere
 %     Quellen position, rechteckram ohne boundaries, raummoden zeigen, Z->0
-%     (freifeld, sommerfeld ansprechen),Time componten einbauen (moden
-%     schwingung zeigen), optimize performance ansprechen
+%     (freifeld, sommerfeld ansprechen),
+
+%     1D average p rausnehmen, save datein löschen, warum nur 10 log 1d?
 %     Probleme: wieso läuft durch boundary, el_mat, domains,
-%     einheitlich,(+ander TEchnik Highlights)
+%     einheitlich,(+ander TEchnik Highlights), delete git
 % 1D: pressure über x zeigen und pressure über f, Z variieren
 
 %% 
 %==================================================================
 % Parameters definition
 % **************************************************************
+
+% Acoustical constants
 rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
 air_damp = 0.00; % Damping by the cavity air
+p_0 = 2e-5; % reference root man squared sound pressure (hearing threshold 1kHz)
 
-Z = [50,50,50]; % Acoustical impedance at wall, scattering object, piston casing (sound pressure divided by particle velocity, value range ]0,inf[)
+% Piston source parameters
+freq = [54.5,110]; % Frequencies piston excitation in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength)
+u_n = repelem(1/10000000,length(freq)); % sound particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
+piston_xy = [0.6,2]; %  Piston position x and y in m ( at loudspeaker location [0.6,2])
+% interesting plots 
+% # freq=34 (x-axial (n_x=1) mode, very strong standing wave)
+% # freq=68 (x-axial (n_x=2), even with piston sound pressure does not increase significantly at left wave valley )
+% # freq=110 (tangential (2,2) mode, very strong nodes and increases of sound pressure in corners)
+% # By increasing the frequency the wave equation allows more resonances and so the sound field gets more homogenous (diffuse)
+% # By increasing the absorption degrees the standing waves get less distinct (the Q factors of the resonances widen)
 
-model_Z_by_alpha = true ; % model acoustical impedances by commonly used absorption coefficients with Mommertz's method (1996)
-alpha = [0.4,0.1,0.01]; % asorption coefficent wall, object, piston casing (sound energy absorbed per reflection in percent, value range ]0,1[)
+% Boundaries material paramters
+model_Z_by_alpha = true ; % model acoustical admittances by practical more commonly measured random incidence absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
+% Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
+alpha = [0.1,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (sound energy absorbed per reflection in percent, value range ]0,1[)
+% For experts ( acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
+% set model_Z_by_alpha==false -> 
+Z = [50,50,50]; % acoustical impedance at wall, scattering object, piston casing (=sound pressure divided by particle velocity at boundary, value range ]0,inf[)
 
-freq = 500; % Frequency of piston excitation in Hz (should be maximum 500 Hz otherwise less then 6 elements per wavelength)
+
+% FEM solver
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-piston_xy = [0.6,2]; %  Piston position x and y ( correct position source [0.6,2])
+
 % *************************************************************************
 %% Acoustical properties calucation
 
-
-% Boundary
-Z0 = rho0 * c0; % Calculate impedance of air
-beta= 1./Z; % Calculate admittances from impedances
-Nmat = 3; % number of materials
-% model acoustical admittances
-fprintf('Modelled acoustical impedance of wall, object and piston casing is: \n');
-if(model_Z_by_alpha)
-    for i = 1:Nmat
-        beta(i)=1/(Mommertz(alpha(i))*Z0);  % model acoustical admittances by absorption coefficients with Mommertz's method
-        fprintf('%.0f \n',1/beta(i));
-    end
-end
-
-% Excitation
+% Piston source
 w=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
-lamda = c0/freq; % Calculate wave length of loudspeaker excitation frequency
+Nfreq = length(freq); % number of frequencies
 lamda_min= c0/max(freq); % Smallest wavelength in the room
 k0 = w /c0; % wave number
 
-% Room modes
+% Boundaries
+Z0 = rho0 * c0; % Calculate impedance of air
+beta= 1./Z; % Calculate admittances from impedances
+% Model acoustical admittances with Mommertz (1996) method
+% Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
+
+if(model_Z_by_alpha)
+    fprintf('Modelled acoustical impedance (Mommertz, 1996) for ');
+    for nf = 1:Nfreq
+        fprintf('frequency %.0f Hz: \n',freq(nf));
+        switch nf
+            case 1
+                fprintf('wall:\n')
+            case 2
+                fprintf('scattering object:\n')
+            case 3
+                fprintf('piston casing:\n')
+        end
+        beta(nf)=1/(Mommertz(alpha(nf))*Z0);
+        fprintf('%.0f Pa s/m3 \n',1/beta(nf));
+    end
+end
+
+
+
+% Calculate Room modes with analytic approach for rectangular room:
+% Vorländer, M. (2008). Auralization: Fundamentals of Acoustics, Modelling, Simulation,
+% Algorithms and Acoustic Virtual Reality. Berlin Heidelberg: Springer Verlag, p. 55.
 [x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
 L=x_max_bc-x_min_bc; % Length of the room in meter
 W=y_max_bc-y_min_bc; % Width of the room in meter
@@ -64,14 +96,48 @@ f_ax_mode=zeros(10,1);
 f_ay_mode=zeros(10,1);
 f_tan_mode=zeros(10,10);
 
-for i=linspace(1,n_modes)
-    f_ax_mode(i)=c0/2*sqrt((i/L)^2);
-    f_ay_mode(i)=c0/2*sqrt((i/W)^2);
+for nf=linspace(1,n_modes)
+    f_ax_mode(nf)=c0/2*sqrt((nf/L)^2);
+    f_ay_mode(nf)=c0/2*sqrt((nf/W)^2);
     for j = linspace(1,n_modes)
-        f_tan_mode(i,j)=c0/2*sqrt((i/L)^2+(j/W)^2);
+        f_tan_mode(nf,j)=c0/2*sqrt((nf/L)^2+(j/W)^2);
     end
 end
 
+for nf=1:length(w)
+    fprintf('Frequency %.0f Hz: \n',w(nf));
+    % print closest modes
+    nr_closest_modes=3;
+    min_ax=abs(f_ax_mode-freq(nf));
+    min_ay=abs(f_ay_mode-freq(nf));
+    min_tan=abs(f_tan_mode-freq(nf));
+    for ax_i=1:nr_closest_modes
+        % x-axial
+        [~,ax_mode_nearest_idx] = min(min_ax);
+        ax_mode_nearest_f=f_ax_mode(ax_mode_nearest_idx,1);
+        fprintf('%.0f',ax_i);
+        fprintf('. closest x-axial mode (n_x=%.0f) at %.0f Hz\n',[ax_mode_nearest_idx,ax_mode_nearest_f]);
+        min_ax(ax_mode_nearest_idx,1)=inf;
+    end
+    for ax_i=1:3
+        % y-axial
+        [~,ay_mode_nearest_idx] = min(min_ay);
+        ay_mode_nearest_f=f_ay_mode(ay_mode_nearest_idx,1);
+        fprintf('%.0f',ax_i);
+        fprintf('. closest y-axial y mode (n_y=%.0f) at %.0f Hz\n',[ay_mode_nearest_idx,ay_mode_nearest_f]);
+        min_ay(ay_mode_nearest_idx,1)=inf;
+    end
+    for ax_i=1:3
+        % xy-tangential
+        [~,tan_mode_nearest_idx]=min(min_tan(:));
+        [row,col]=ind2sub(size(min_tan),tan_mode_nearest_idx);
+        tan_mode_nearest_idx=[row,col];
+        tan_mode_nearest_f=f_tan_mode(tan_mode_nearest_idx(1),tan_mode_nearest_idx(2));
+        fprintf('%.0f',ax_i);
+        fprintf('. closest xy-tangential mode (n_x=%.0f,n_y=%.0f) at %.0fHz\n',[tan_mode_nearest_idx,tan_mode_nearest_f]);
+        min_tan(tan_mode_nearest_idx(1),tan_mode_nearest_idx(2))=inf;
+    end
+end
 % Approximated number of elements per wavelength 
 S_e_average=L*W/Ne; % Average area of an element (rough approximation)
 approx_average_length_element = sqrt(S_e_average*2);
@@ -118,8 +184,8 @@ nodes_bc_material=[nodes_bc_material; nodes_bc_index(find(nodes_bc_xy(:,1)>0 & n
 % nodes_bc_xy_piston_casing_area=find(nodes(:,1)>=min(nodes_bc_xy_piston_casing(:,1)) & nodes(:,1)<=max(nodes_bc_xy_piston_casing(:,1))  & nodes(:,2)>=min(nodes_bc_xy_piston_casing(:,2)) & nodes(:,2)<=max(nodes_bc_xy_piston_casing(:,2)));
 % test=nodes_bc_xy_piston_casing_area(not(ismember(nodes_bc_xy_piston_casing_area,nodes_bc_material{3})));
 
-for i = 1:Nmat
-    nodes_beta(nodes_bc_material{i})= beta(i);
+for nf = 1:Nfreq
+    nodes_beta(nodes_bc_material{nf})= beta(nf);
 end
     
 % make room without interior objects
@@ -133,19 +199,20 @@ fprintf('Assemble stiffness and mass matrix: \n');
 tic
 for e = 1:Ne
     %% Compute elementary stiffness and mass matrices
-    % shape functions for linear triangular with 3 nodes 
+    % shape functions for linear triangular with 3 nodes and Galerkin
+    % approach
     % Get global x y position of all nodes of element
     e_n_xy = zeros(Ne_Nn,N_dim);
-    b = zeros(Ne_Nn,1);
+    f = zeros(Ne_Nn,1);
     c= zeros(Ne_Nn,1);
     for e_n = 1:Ne_Nn
        e_n_xy(e_n,:)= nodes(el_no(e,e_n),:);
     end
     
     %  y local coordinates
-    b(1) = e_n_xy(2,2) - e_n_xy(3,2); % y_23
-    b(2) = e_n_xy(3,2) - e_n_xy(1,2); % y_31
-    b(3) = e_n_xy(1,2) - e_n_xy(2,2); % y_12
+    f(1) = e_n_xy(2,2) - e_n_xy(3,2); % y_23
+    f(2) = e_n_xy(3,2) - e_n_xy(1,2); % y_31
+    f(3) = e_n_xy(1,2) - e_n_xy(2,2); % y_12
 
     % x local coordinates
     c(1) = e_n_xy(3,1) - e_n_xy(2,1); % x_32
@@ -153,31 +220,31 @@ for e = 1:Ne
     c(3) = e_n_xy(2,1) - e_n_xy(1,1); % x_21
 
     % area of triangular element
-    area2 = abs(b(1)*c(2) - b(2)*c(1)); % y_23*x_13 - y_31*x_32
+    area2 = abs(f(1)*c(2) - f(2)*c(1)); % y_23*x_13 - y_31*x_32
     area  = area2 / 2;
 
     % elementary stiffness matrix
-    B = [b(1),b(2), b(3);
+    B = [f(1),f(2), f(3);
           c(1),c(2),c(3)];
     B = B / area2;
-    Ke = sparse(transpose(B)*B*area);
+    K_e = sparse(transpose(B)*B*area);
 
     % elementary mass matrix
-    Me = [ 2 , 1 , 1 ;
+    M_e = [ 2 , 1 , 1 ;
          1 , 2 , 1 ;
          1 , 1 , 2 ];
-    Me = sparse(Me * area / 12);
+    M_e = sparse(M_e * area / 12 / c0^2);
     
-    % Me = [ 1 , 0 , 0 ;
-           % 0 , 1 , 0 ;
-           % 0 , 0 , 1 ];
-    % Me = Me * area / 3 ;
+%     M_e = [ 1 , 0 , 0 ;
+%            0 , 1 , 0 ;
+%            0 , 0 , 1 ];
+%     M_e = sparse(M_e * area / 3 / c0^2);
     % Find the equation number list for the i-th element
     % eqnum = el_no(e,:); % the 3 node numbers at element e
     % for i = 1 : Ne_Nn
       % for j = 1 : Ne_Nn
-        % K(eqnum(i),eqnum(j)) = K(eqnum(i),eqnum(j)) + Ke(i,j);
-        % M(eqnum(i),eqnum(j)) = M(eqnum(i),eqnum(j)) + Me(i,j);
+        % K(eqnum(i),eqnum(j)) = K(eqnum(i),eqnum(j)) + K_e(i,j);
+        % M(eqnum(i),eqnum(j)) = M(eqnum(i),eqnum(j)) + M_e(i,j);
       % end
     % end
 
@@ -185,82 +252,108 @@ for e = 1:Ne
     %% Assemble global stiffness and mass matrix 
     
     % positions where to assemble
-    LM=sparse(Ne_Nn,Nn);
+    pos_e=sparse(Ne_Nn,Nn);
     for e_n= 1:Ne_Nn
         node_number = el_no(e,e_n);
-        LM(e_n,node_number) = 1;
+        pos_e(e_n,node_number) = 1;
     end
     
     % assembling
-    K = K + LM'*Ke*LM; % K Stiffness Matrix
-    M = M + LM'*Me*LM; % M Mass Matrix
+    K = K + pos_e'*K_e*pos_e; % K Stiffness Matrix
+    M = M + pos_e'*M_e*pos_e; % M Mass Matrix
 end
 toc
 
 %% Solving the FEM system to get sound pressure in room
-fprintf('Integrate boundaries and force vector and solve weak form for every frequency: \n');
-tic
+
 
 V = zeros(Nn,length(w));  % normalized squared sound pressure in dB
-for nw=1:length(w)
+for nf=1:Nfreq
     
     % Get current angular frequency
-    w_n = w(nw);
+    w_n = w(nf);
+    fprintf('Frequency %.0f Hz: \n',w(nf));
+    fprintf('Integrate boundaries and force vector and solve weak form: \n');
+    tic
     
     % integrate impedance conditions for frequency into damping matrix
-    C = sparse(Nn,Nn);
+    A = sparse(Nn,Nn);
     Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
     Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
-    [Bn, Bm] = size(C);
+    [Bn, Bm] = size(A);
     diagIdx = 1:Bn+1:Bn*Bm;
-    C(diagIdx(Boundary_vector)) = nodes_beta(Boundary_vector);
+    
+    A(diagIdx(Boundary_vector)) = nodes_beta(Boundary_vector)*rho0;
 
-    % Build force vector for frequency
-    b = sparse(Nn,1); 
-    b(piston_node) = w_n^2/10000000;
-
+    % Build force vector for angular frequency
+    f = sparse(Nn,1); 
+    f(piston_node) = w_n^2*rho0*u_n(nf);
+    
     % Add global stiffness, mass and boundary matrix to one matrix 
     % representing the left side of the weak form of the Helmholtz equation
-    A = K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w_n*C/(rho0*c0);
+    % A = K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w_n*C/(rho0*c0);
+    Matrix = K - w_n^2*M/(1+1i*air_damp)+1i*w_n*A;
 
     switch solver
             % ***************************
     case 1  % direct sparse matrix solver
             % ***************************
         spparms('autoamd',0);
-        permut=colamd(A); % Matrix reordering (bandwidth reduction)
-        Vp = A (permut,permut) \ b(permut); % Direct solution
+        permut=colamd(Matrix); % Matrix reordering (bandwidth reduction)
+        Vp = Matrix (permut,permut) \ f(permut); % Direct solution
         Vc(permut)=Vp; % Mapping to the original numbering 
             % **********************
     case 2  % GMRES iterative solver
             % **********************
         M1=sparse(Nn,Nn);
-        diag_A=diag(A);
+        diag_A=diag(Matrix);
         for p=1:Nn
            M1(p,p)=diag_A(p); 
         end
-        [Vc,flag,relres,iter]=gmres(A,b,[],1e-7,Nn,M1);
+        [Vc,flag,relres,iter]=gmres(Matrix,f,[],1e-7,Nn,M1);
     end    
+    
+    toc
+    
+    fprintf('Plot field: \n');
+    tic
+    % calculate sound pressure level of steady state field
     P_magnitude = abs(Vc); % sound pressure magnitude
-    L_P_absolut = 20*log10(P_magnitude/2e-5);
-    L_P_dB = 20*log10(P_magnitude/max(P_magnitude)); % normalized squared sound pressure level in dB
-    V(:,nw)=L_P_absolut;
-end
-toc
-%% Plot field
-fprintf('Plot field: \n');
-tic
+    P_phase = angle(Vc); % sound pressure phase
+    P_real=real(P_magnitude.*exp(1i*P_phase*w_n));
+    L_P_absolut_dB = 20*log10((P_magnitude/sqrt(2))/p_0)';
+    L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized squared sound pressure level in dB
+    L_P_average = 20*log10(mean(P_magnitude/sqrt(2))/p_0);
 
-if 1 % Field Plot
-% V2=Field;
-fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-set_figure_1;
-find_min_max;
-field_plot;
-geometry_plot;
+%     % time dependent evaluation
+%     t_vector_nr=10;
+%     P_exp_t = ((P_magnitude.*exp(1i*P_phase*w_n))'*(exp((w_n*linspace(0,1,t_vector_nr))*-1i)));
+%     P_exp_t_real = real(P_exp_t);
+%     P_exp_t_magnitude=abs(P_exp_t);
+%     P_exp_t_phase=angle(P_exp_t);
+%     L_P_t_dB = 20*log10(P_exp_t_real(:,1).^2/p_0);
+    
+    % assign field to plot
+    V(:,1)=L_P_absolut_dB(:,1);
+    
+    if 1 % Field Plot
+    % V2=Field;
+    fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+    set_figure_1;
+    find_min_max;
+    field_plot;
+    geometry_plot;
+    end
+    toc
 end
 
-toc
+
+    
+% for plot_i = 1:t_vector_nr
+    % L_P_t_dB = 20*log10(L_P_average(:,plot_i).^2/p_0);
+    % V(:,nw)=L_P_t_dB(:,1);
+% end
+
 % %% strg r, t
 % if 1 % Geometry Plot
 % figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
@@ -281,3 +374,4 @@ toc
 % geometry_plot;
 % plot_boundary_nodes;
 % end
+% 
