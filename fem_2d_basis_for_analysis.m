@@ -1,10 +1,11 @@
 % FEM 2-D Scalar Analysis
-% 2D Acoustics
+% 2D Acoustics: Model sound pressure level in a room excited by a piston
 % Plot: geometry, mesh, boundary nodes, and field
 
 % Load ASCII data: mesh, boundary nodes, domains (COMSOL is used as a mesh
 % generator)
 load_data;
+set(gcf,'color','w');
 
 % to do:
 % 2D: Präsi: hohe f, niedrige f vergleichen (extreme druckunterschiede), hohe und niedrige Impedanz Wand, andere
@@ -26,9 +27,10 @@ rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
 air_damp = 0.00; % Damping by the cavity air
 p_0 = 2e-5; % reference root man squared sound pressure (hearing threshold 1kHz)
+Z0 = rho0 * c0; % Specific impedance of fluid
 
 % Piston source parameters
-freq = [54.5,110]; % Frequencies piston excitation in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength)
+freq = [500]; % Frequencies piston excitation in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength)
 u_n = repelem(1/10000000,length(freq)); % sound particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
 piston_xy = [0.6,2]; %  Piston position x and y in m ( at loudspeaker location [0.6,2])
 % interesting plots 
@@ -41,11 +43,10 @@ piston_xy = [0.6,2]; %  Piston position x and y in m ( at loudspeaker location [
 % Boundaries material paramters
 model_Z_by_alpha = true ; % model acoustical admittances by practical more commonly measured random incidence absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
 % Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
-alpha = [0.1,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (sound energy absorbed per reflection in percent, value range ]0,1[)
-% For experts ( acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
+alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (sound energy absorbed per reflection in percent, value range ]0,1[)
+% For experts (acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
 % set model_Z_by_alpha==false -> 
 Z = [50,50,50]; % acoustical impedance at wall, scattering object, piston casing (=sound pressure divided by particle velocity at boundary, value range ]0,inf[)
-
 
 % FEM solver
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
@@ -60,29 +61,26 @@ lamda_min= c0/max(freq); % Smallest wavelength in the room
 k0 = w /c0; % wave number
 
 % Boundaries
-Z0 = rho0 * c0; % Calculate impedance of air
-beta= 1./Z; % Calculate admittances from impedances
+beta = 1./Z; % Calculate admittances from impedances
+Nmat = 3; % number of boundary materials
 % Model acoustical admittances with Mommertz (1996) method
 % Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
 
 if(model_Z_by_alpha)
-    fprintf('Modelled acoustical impedance (Mommertz, 1996) for ');
-    for nf = 1:Nfreq
-        fprintf('frequency %.0f Hz: \n',freq(nf));
-        switch nf
+    fprintf('Modelled specific acoustical impedance (Mommertz, 1996) for \n');
+    for mat = 1:Nmat
+        switch mat
             case 1
-                fprintf('wall:\n')
+                fprintf('wall with absorption coefficient = %.2f:\n', alpha(mat))
             case 2
-                fprintf('scattering object:\n')
+                fprintf('scattering object with absorption coefficient = %.2f:\n', alpha(mat))
             case 3
-                fprintf('piston casing:\n')
+                fprintf('piston casing with absorption coefficient = %.2f:\n', alpha(mat))
         end
-        beta(nf)=1/(Mommertz(alpha(nf))*Z0);
-        fprintf('%.0f Pa s/m3 \n',1/beta(nf));
+        beta(mat)=1/(Mommertz(alpha(mat))*Z0);
+        fprintf('Z/Z0 = %.0f \n',(1/beta(mat))/Z0);
     end
 end
-
-
 
 % Calculate Room modes with analytic approach for rectangular room:
 % Vorländer, M. (2008). Auralization: Fundamentals of Acoustics, Modelling, Simulation,
@@ -235,10 +233,10 @@ for e = 1:Ne
          1 , 1 , 2 ];
     M_e = sparse(M_e * area / 12 / c0^2);
     
-%     M_e = [ 1 , 0 , 0 ;
-%            0 , 1 , 0 ;
-%            0 , 0 , 1 ];
-%     M_e = sparse(M_e * area / 3 / c0^2);
+    M_e = [ 1 , 0 , 0 ;
+           0 , 1 , 0 ;
+           0 , 0 , 1 ];
+    M_e = sparse(M_e * area / 3 / c0^2);
     % Find the equation number list for the i-th element
     % eqnum = el_no(e,:); % the 3 node numbers at element e
     % for i = 1 : Ne_Nn
@@ -321,9 +319,9 @@ for nf=1:Nfreq
     P_magnitude = abs(Vc); % sound pressure magnitude
     P_phase = angle(Vc); % sound pressure phase
     P_real=real(P_magnitude.*exp(1i*P_phase*w_n));
-    L_P_absolut_dB = 20*log10((P_magnitude/sqrt(2))/p_0)';
-    L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized squared sound pressure level in dB
-    L_P_average = 20*log10(mean(P_magnitude/sqrt(2))/p_0);
+    L_P_absolut_dB = 20*log10((P_magnitude/sqrt(2))/p_0)'; % absolut sound pressure level in dB
+    L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized sound pressure level in dB
+    L_P_average_dB = 20*log10(mean(P_magnitude/sqrt(2))/p_0); % average sound pressure level in room in dB
 
 %     % time dependent evaluation
 %     t_vector_nr=10;

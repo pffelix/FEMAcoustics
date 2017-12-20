@@ -114,7 +114,12 @@ cb_tick(Ncb_level)=n;
 cb_values_str=strcat(num2str(cb_values,'%0.0f\n'),' dB');
 c=colorbar('South','XTickLabel',cb_values_str,'FontSize',14);
 c.Position=[0.1,0.05,0.83,0.05];
-title_1=['Sound pressure level SPL at ', num2str(freq(nw),'%0.0f\n'),' Hz'];
-title_2 = ['room average SPL = ',num2str(L_P_average,'%0.0f'),' dB'];
-title_3 = ['absorption coefficient = ',num2str(alpha(1),'%0.2f')];
-title({title_1;title_2;title_3})
+title_1=[num2str(freq(nf),'%0.0f\n'),' Hz'];
+title_2 = ['average SPL = ',num2str(L_P_average_dB,'%0.0f'),' dB'];
+if (model_Z_by_alpha)
+    title_3 = ['absorption coefficient wall = ',num2str(alpha(1),'%0.2f')];
+    % title_4=['wall modelled specific impedance Z/Z0 = ',num2str(1/beta(1)/Z0,'%0.0f')];
+else
+    title_3 = ['specific impedance wall Z/Z0 = ',num2str(1/beta(1)/Z0,'%0.0f')];
+end
+title({title_1;title_3;title_2},'fontsize',20)
