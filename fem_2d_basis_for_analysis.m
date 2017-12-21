@@ -8,14 +8,7 @@ load_data;
 set(gcf,'color','w');
 
 % to do:
-% 2D: Präsi: hohe f, niedrige f vergleichen (extreme druckunterschiede), hohe und niedrige Impedanz Wand, andere
-%     Quellen position, rechteckram ohne boundaries, raummoden zeigen, Z->0
-%     (freifeld, sommerfeld ansprechen),
-
-%     1D average p rausnehmen, save datein löschen, warum nur 10 log 1d?
-%     Probleme: wieso läuft durch boundary, el_mat, domains,
-%     einheitlich,(+ander TEchnik Highlights), delete git
-% 1D: pressure über x zeigen und pressure über f, Z variieren
+%     save datein löschen, dateien paramter initialisieren, zeilen korrigiern, delete git
 
 %% 
 %==================================================================
@@ -30,9 +23,9 @@ p_0 = 2e-5; % reference root man squared sound pressure (hearing threshold 1kHz)
 Z0 = rho0 * c0; % Specific impedance of fluid
 
 % Piston source parameters
-freq = [500]; % Frequencies piston excitation in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength)
+freq = [34]; % Frequencies piston excitation in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength)
 u_n = repelem(1/10000000,length(freq)); % sound particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
-piston_xy = [0.6,2]; %  Piston position x and y in m ( at loudspeaker location [0.6,2])
+piston_xy = [3,3]; %  Piston position x and y in m ( at loudspeaker location [0.6,2])
 % interesting plots 
 % # freq=34 (x-axial (n_x=1) mode, very strong standing wave)
 % # freq=68 (x-axial (n_x=2), even with piston sound pressure does not increase significantly at left wave valley )
@@ -46,11 +39,11 @@ model_Z_by_alpha = true ; % model acoustical admittances by practical more commo
 alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (sound energy absorbed per reflection in percent, value range ]0,1[)
 % For experts (acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
 % set model_Z_by_alpha==false -> 
-Z = [50,50,50]; % acoustical impedance at wall, scattering object, piston casing (=sound pressure divided by particle velocity at boundary, value range ]0,inf[)
+Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, piston casing (=sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + ]0,inf[*i )
 
 % FEM solver
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-
+video = 1;
 % *************************************************************************
 %% Acoustical properties calucation
 
@@ -207,12 +200,12 @@ for e = 1:Ne
        e_n_xy(e_n,:)= nodes(el_no(e,e_n),:);
     end
     
-    %  y local coordinates
+    %  y local coordinates nodes of element
     f(1) = e_n_xy(2,2) - e_n_xy(3,2); % y_23
     f(2) = e_n_xy(3,2) - e_n_xy(1,2); % y_31
     f(3) = e_n_xy(1,2) - e_n_xy(2,2); % y_12
 
-    % x local coordinates
+    % x local coordinates nodes of element
     c(1) = e_n_xy(3,1) - e_n_xy(2,1); % x_32
     c(2) = e_n_xy(1,1) - e_n_xy(3,1); % x_13
     c(3) = e_n_xy(2,1) - e_n_xy(1,1); % x_21
@@ -221,10 +214,11 @@ for e = 1:Ne
     area2 = abs(f(1)*c(2) - f(2)*c(1)); % y_23*x_13 - y_31*x_32
     area  = area2 / 2;
 
-    % elementary stiffness matrix
+    % elementary strain matrix
     B = [f(1),f(2), f(3);
-          c(1),c(2),c(3)];
-    B = B / area2;
+          c(1),c(2),c(3)]/area2;
+    
+    % elementary stiffness matrix
     K_e = sparse(transpose(B)*B*area);
 
     % elementary mass matrix
@@ -233,10 +227,6 @@ for e = 1:Ne
          1 , 1 , 2 ];
     M_e = sparse(M_e * area / 12 / c0^2);
     
-    M_e = [ 1 , 0 , 0 ;
-           0 , 1 , 0 ;
-           0 , 0 , 1 ];
-    M_e = sparse(M_e * area / 3 / c0^2);
     % Find the equation number list for the i-th element
     % eqnum = el_no(e,:); % the 3 node numbers at element e
     % for i = 1 : Ne_Nn
@@ -264,89 +254,90 @@ toc
 
 %% Solving the FEM system to get sound pressure in room
 
+    
+    V = zeros(Nn,length(w));  % normalized squared sound pressure in dB
+    for nf=1:Nfreq
+        if video
+            video_t=exp(linspace(0,1,100)*;
+        % Get current angular frequency
+        w_n = w(nf);
+        fprintf('Frequency %.0f Hz: \n',w(nf));
+        fprintf('Integrate boundaries and force vector and solve weak form: \n');
+        tic
 
-V = zeros(Nn,length(w));  % normalized squared sound pressure in dB
-for nf=1:Nfreq
-    
-    % Get current angular frequency
-    w_n = w(nf);
-    fprintf('Frequency %.0f Hz: \n',w(nf));
-    fprintf('Integrate boundaries and force vector and solve weak form: \n');
-    tic
-    
-    % integrate impedance conditions for frequency into damping matrix
-    A = sparse(Nn,Nn);
-    Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
-    Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
-    [Bn, Bm] = size(A);
-    diagIdx = 1:Bn+1:Bn*Bm;
-    
-    A(diagIdx(Boundary_vector)) = nodes_beta(Boundary_vector)*rho0;
+        % integrate impedance conditions for frequency into damping matrix
+        A = sparse(Nn,Nn);
+        Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
+        Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
+        [Bn, Bm] = size(A);
+        diagIdx = 1:Bn+1:Bn*Bm;
 
-    % Build force vector for angular frequency
-    f = sparse(Nn,1); 
-    f(piston_node) = w_n^2*rho0*u_n(nf);
-    
-    % Add global stiffness, mass and boundary matrix to one matrix 
-    % representing the left side of the weak form of the Helmholtz equation
-    % A = K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w_n*C/(rho0*c0);
-    Matrix = K - w_n^2*M/(1+1i*air_damp)+1i*w_n*A;
+        A(diagIdx(Boundary_vector)) = nodes_beta(Boundary_vector)*rho0;
 
-    switch solver
-            % ***************************
-    case 1  % direct sparse matrix solver
-            % ***************************
-        spparms('autoamd',0);
-        permut=colamd(Matrix); % Matrix reordering (bandwidth reduction)
-        Vp = Matrix (permut,permut) \ f(permut); % Direct solution
-        Vc(permut)=Vp; % Mapping to the original numbering 
-            % **********************
-    case 2  % GMRES iterative solver
-            % **********************
-        M1=sparse(Nn,Nn);
-        diag_A=diag(Matrix);
-        for p=1:Nn
-           M1(p,p)=diag_A(p); 
+        % Build force vector for angular frequency
+        f = sparse(Nn,1); 
+        f(piston_node) = w_n^2*rho0*u_n(nf);
+
+        % Add global stiffness, mass and boundary matrix to one matrix 
+        % representing the left side of the weak form of the Helmholtz equation
+        % A = K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w_n*C/(rho0*c0);
+        Matrix = K - w_n^2*M/(1+1i*air_damp)+1i*w_n*A;
+
+        switch solver
+                % ***************************
+        case 1  % direct sparse matrix solver
+                % ***************************
+            spparms('autoamd',0);
+            permut=colamd(Matrix); % Matrix reordering (bandwidth reduction)
+            Vp = Matrix (permut,permut) \ f(permut); % Direct solution
+            Vc(permut)=Vp; % Mapping to the original numbering 
+                % **********************
+        case 2  % GMRES iterative solver
+                % **********************
+            M1=sparse(Nn,Nn);
+            diag_A=diag(Matrix);
+            for p=1:Nn
+               M1(p,p)=diag_A(p); 
+            end
+            [Vc,flag,relres,iter]=gmres(Matrix,f,[],1e-7,Nn,M1);
+        end    
+
+        toc
+
+        fprintf('Plot field: \n');
+        tic
+        % calculate sound pressure level of steady state field
+        P_magnitude = abs(Vc); % sound pressure magnitude
+        P_phase = angle(Vc); % sound pressure phase
+        P_real=real(P_magnitude.*exp(1i*P_phase*w_n));
+        L_P_absolut_dB = 20*log10((P_magnitude/sqrt(2))/p_0)'; % absolut sound pressure level in dB
+        L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized sound pressure level in dB
+        L_P_average_dB = 20*log10(mean(P_magnitude/sqrt(2))/p_0); % average sound pressure level in room in dB
+
+    %     % time dependent evaluation
+    %     t_vector_nr=10;
+    %     P_exp_t = ((P_magnitude.*exp(1i*P_phase*w_n))'*(exp((w_n*linspace(0,1,t_vector_nr))*-1i)));
+    %     P_exp_t_real = real(P_exp_t);
+    %     P_exp_t_magnitude=abs(P_exp_t);
+    %     P_exp_t_phase=angle(P_exp_t);
+    %     L_P_t_dB = 20*log10(P_exp_t_real(:,1).^2/p_0);
+
+        % assign field to plot
+        V(:,1)=L_P_absolut_dB(:,1);
+
+        if 1 % Field Plot
+        % V2=Field;
+        fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+        set_figure_1;
+        find_min_max;
+        field_plot;
+        geometry_plot;
         end
-        [Vc,flag,relres,iter]=gmres(Matrix,f,[],1e-7,Nn,M1);
-    end    
-    
-    toc
-    
-    fprintf('Plot field: \n');
-    tic
-    % calculate sound pressure level of steady state field
-    P_magnitude = abs(Vc); % sound pressure magnitude
-    P_phase = angle(Vc); % sound pressure phase
-    P_real=real(P_magnitude.*exp(1i*P_phase*w_n));
-    L_P_absolut_dB = 20*log10((P_magnitude/sqrt(2))/p_0)'; % absolut sound pressure level in dB
-    L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized sound pressure level in dB
-    L_P_average_dB = 20*log10(mean(P_magnitude/sqrt(2))/p_0); % average sound pressure level in room in dB
-
-%     % time dependent evaluation
-%     t_vector_nr=10;
-%     P_exp_t = ((P_magnitude.*exp(1i*P_phase*w_n))'*(exp((w_n*linspace(0,1,t_vector_nr))*-1i)));
-%     P_exp_t_real = real(P_exp_t);
-%     P_exp_t_magnitude=abs(P_exp_t);
-%     P_exp_t_phase=angle(P_exp_t);
-%     L_P_t_dB = 20*log10(P_exp_t_real(:,1).^2/p_0);
-    
-    % assign field to plot
-    V(:,1)=L_P_absolut_dB(:,1);
-    
-    if 1 % Field Plot
-    % V2=Field;
-    fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-    set_figure_1;
-    find_min_max;
-    field_plot;
-    geometry_plot;
+        toc
     end
-    toc
+
 end
 
-
-    
 % for plot_i = 1:t_vector_nr
     % L_P_t_dB = 20*log10(L_P_average(:,plot_i).^2/p_0);
     % V(:,nw)=L_P_t_dB(:,1);

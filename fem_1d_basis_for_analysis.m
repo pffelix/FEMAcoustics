@@ -32,7 +32,7 @@ model_Z_by_alpha = false ; % model acoustical impedances by practical more commo
 alpha = 0.9; % absorption coefficent at boundary (sound energy absorbed per reflection in percent, value range ]0,1[)
 % For experts ( acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
 % set model_Z_by_alpha==false -> 
-Z = rho0 * c0*(1); % acoustical impedance at boundary (=sound pressure divided by particle velocity at boundary, value range ]0,inf[)
+Z = Z0*100; % acoustical impedance at boundary (=sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + ]0,inf[*i )
 
 % *************************************************************************
 
@@ -112,12 +112,8 @@ for nf=1:Nfreq
     f(piston_nodes) = w_n^2*rho0*u_n(nf); % at piston position
     Matrix = K - w_n^2*M/(1+1i*air_damp)+1i*w_n*A;
     Vc = Matrix\f; % Solve the system to get pressure in tube
-    Pquad_direct(nf) = (rho0*c0^2)* real(Vc'*M*Vc)/(2*L);
     P_magnitude = abs(Vc); % sound pressure magnitude
     P_phase = angle(Vc); % sound pressure phase
-    P_real(:,nf)=real(P_magnitude.*exp(1i*P_phase*w_n));
-    % L_P_absolut_dB(:,nf) = 20*log10((P_magnitude/sqrt(2))/p_0)'; % absolut sound pressure level in dB
-    % L_P_normalized_dB(:,nf) = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized sound pressure level in dB
     L_P_average_dB(:,nf) = 20*log10(mean(P_magnitude/sqrt(2))/p_0); % average sound pressure level in room in dB
     
 end
