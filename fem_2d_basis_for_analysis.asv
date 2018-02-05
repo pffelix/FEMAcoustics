@@ -83,7 +83,7 @@ if(model_Z_by_alpha)
     end
 end
 
-%% Calculate Room modes with analytic approach for rectangular room:
+% Calculate Room modes with analytic approach for rectangular room:
 % Vorländer, M. (2008). Auralization: Fundamentals of Acoustics, Modelling, Simulation,
 % Algorithms and Acoustic Virtual Reality. Berlin Heidelberg: Springer Verlag, p. 55.
 [x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
@@ -137,13 +137,12 @@ for nf=1:length(w)
         min_tan(tan_mode_nearest_idx(1),tan_mode_nearest_idx(2))=inf;
     end
 end
-
-%% Get Approximated number of elements per wavelength 
+% Approximated number of elements per wavelength 
 S_e_average=L*W/Ne; % Average area of an element (rough approximation)
 approx_average_length_element = sqrt(S_e_average*2);
 elements_per_lamda_min= lamda_min/ approx_average_length_element;
 if(elements_per_lamda_min<6)
-    fprintf('frequency to high for given number of elements');
+    fprintf('frequency to high for element number');
 end
 
 %% Step 1: Set up mesh
@@ -328,8 +327,8 @@ for nf=1:Nfreq
     P_phase = angle(Vc); % sound pressure phase
     % P_real=real(P_magnitude.*exp(1i*P_phase*w_n));
     L_P_absolut_dB = 20*log10((P_magnitude/sqrt(2))/p_0)'; % absolut RMS sound pressure level in dB
-    L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized RMS sound pressure level in dB
-    L_P_average_dB = 20*log10(mean(P_magnitude/sqrt(2))/p_0); % average RMS sound pressure level in room in dB
+    L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized RMsound pressure level in dB
+    L_P_average_dB = 20*log10(mean(P_magnitude/sqrt(2))/p_0); % average sound pressure level in room in dB
 
 %     % time dependent evaluation
 %     t_vector_nr=10;
