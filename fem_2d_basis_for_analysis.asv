@@ -10,6 +10,14 @@ set(gcf,'color','w');
 % to do:
 %     save datein löschen, dateien paramter initialisieren, zeilen korrigiern, delete git
 
+% interesting plots:
+% # freq=34 (x-axial mode (n_x=1), very strong resonance)
+% # freq=68 (x-axial mode (n_x=2), even with piston sound pressure does not increase significantly at left wave node )
+% # freq=110 (tangential (2,2) mode, very strong nodes and increase of sound pressure in corners)
+% # By increasing the frequency the wave equation allows more resonances and so the sound field gets more homogenous (diffuse)
+% # By increasing the absorption degrees or reducing the impedance of the boundary the standing waves get less distinct (the Q factors of the resonances decrease)
+
+
 %% 
 %==================================================================
 % Parameters definition
@@ -31,35 +39,30 @@ p_0 = 2e-5; % reference sound pressure (hearing threshold 1kHz)
 Z0 = rho0 * c0; % Specific impedance of fluid
 
 %% Source parameters
-freq = [68]; % Sound source frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength at given model)
-u_n = repelem(1/10000000,length(freq)); % "strenght of sound source": expressed by sound particle displacement in m (can be a vector corresponding to every frequency of excitation)
+freq = [68]; % Sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength at given model)
+u_n = repelem(1e-7,length(freq)); % "Strenght of sound source": expressed by particle displacement in m (can be a vector corresponding to every frequency of excitation)
 piston_xy = [0.6,2]; %  x and y position of source in m ( at loudspeaker location [0.6,2])
-% interesting plots 
-% # freq=34 (x-axial mode (n_x=1), very strong resonance)
-% # freq=68 (x-axial mode (n_x=2), even with piston sound pressure does not increase significantly at left wave node )
-% # freq=110 (tangential (2,2) mode, very strong nodes and increase of sound pressure in corners)
-% # By increasing the frequency the wave equation allows more resonances and so the sound field gets more homogenous (diffuse)
-% # By increasing the absorption degrees the standing waves get less distinct (the Q factors of the resonances widen)
 
-%% Boundaries material paramters:
-% Model either by practial measured absorption coefficients or more correct impedance boundaries
-model_Z_by_alpha = true ; % model acoustical impedances by absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
+%% Boundaries paramters
+% Model boundaries either by practial measured absorption coefficients or by physical more correct impedances under assumption of local reaction
+model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
 % Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
 
 % either:
-alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (sound energy absorbed per reflection in percent, value range ]0,1[)
+alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
 % For experts (acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
 % set model_Z_by_alpha==false -> 
 
 % or:
-Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, piston casing (=sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + ]0,inf[*i )
+Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, piston casing (expresses: sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + i*]0,inf[ )
 
 
-% FEM solver
+%% Solver parameters
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
 video = 1;
 % *************************************************************************
-%% Acoustical properties calucation
+%% Non-FEM calculations
+%% Acoustical properties calculation
 
 % Piston source
 w=2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
@@ -89,7 +92,7 @@ if(model_Z_by_alpha)
     end
 end
 
-%% Calculate Room modes with analytic approach for rectangular room:
+%% Room modes calculation with analytic approach for rectangular room:
 % Vorländer, M. (2008). Auralization: Fundamentals of Acoustics, Modelling, Simulation,
 % Algorithms and Acoustic Virtual Reality. Berlin Heidelberg: Springer Verlag, p. 55.
 [x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
@@ -144,7 +147,7 @@ for nf=1:length(w)
     end
 end
 
-%% Get Approximated number of elements per wavelength 
+%% Approximated number of elements per wavelength calculation
 S_e_average=L*W/Ne; % Average area of an element (rough approximation)
 approx_average_length_element = sqrt(S_e_average*2);
 elements_per_lamda_min= lamda_min/ approx_average_length_element;
@@ -152,7 +155,8 @@ if(elements_per_lamda_min<6)
     fprintf('frequency to high for given number of elements');
 end
 
-%% Step 1: Set up mesh
+%% FEM calculations
+%% Step 1: Set up the mesh
 
 % Mesh paramater calculation
 [~, Ne_Nn] = size(elements); % number of nodes at each element
@@ -170,7 +174,7 @@ nodes_no_bc_index(unique(bc_elements)) = [];
 piston_node = nodes_no_bc_index(dsearchn(nodes(nodes_no_bc_index,:),delaunayn(nodes(nodes_no_bc_index,:)),piston_xy)); % calculate closest node to piston point
 % piston_node = 50; % dsearchn(nodes,delaunayn(nodes),piston_xy); 
 
-%% Modify existing mesh
+%% Step 2: Optimize the existing mesh
 
 % assign specific materials to boundary domains wall, object, piston casing
 nodes_beta=zeros(Nn,1);
@@ -200,8 +204,8 @@ end
 % bc_inside_index =unique([find(nodes(:,1)==0); find(nodes(:,2)==0)]); % find alle node indexes which have x or y == 0
 % bc_elements=bc_elements(unique([find(ismember(bc_elements(:,2),bc_inside_index)==1); find(ismember(bc_elements(:,1),bc_inside_index)==1)]),:); % only store nodes with this indexes in bc_elements
 
-%% Build stiffness and mass matrix
-fprintf('Assemble stiffness and mass matrix: \n');
+%% Step 3: Build stiffness and mass matrix
+fprintf('Build and assemble stiffness and mass matrix: \n');
 tic
 for e = 1:Ne
     %% Compute elementary stiffness and mass matrices
@@ -226,12 +230,11 @@ for e = 1:Ne
     c(3) = e_n_xy(2,1) - e_n_xy(1,1); % x_21
 
     % area of triangular element
-    area2 = abs(f(1)*c(2) - f(2)*c(1)); % y_23*x_13 - y_31*x_32
-    area  = area2 / 2;
+    area  = abs(f(1)*c(2) - f(2)*c(1)) / 2; % y_23*x_13 - y_31*x_32
 
     % elementary strain matrix
     B = [f(1),f(2), f(3);
-          c(1),c(2),c(3)]/area2;
+          c(1),c(2),c(3)]/area/2;
     
     % elementary stiffness matrix
     K_e = sparse(transpose(B)*B*area);
@@ -251,8 +254,7 @@ for e = 1:Ne
       % end
     % end
 
-    
-    %% Assemble global stiffness and mass matrix 
+    %% Step 4: Assemble global stiffness and mass matrix 
     
     % positions where to assemble
     pos_e=sparse(Ne_Nn,Nn);
@@ -269,8 +271,7 @@ toc
 
 %% Solving the FEM system to get sound pressure in room
 
-    
-    V = zeros(Nn,length(w));  % normalized squared sound pressure in dB
+V = zeros(Nn,length(w));  % normalized squared sound pressure in dB
 for nf=1:Nfreq
     % Get current angular frequency
     w_n = w(nf);
