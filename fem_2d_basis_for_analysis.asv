@@ -174,7 +174,7 @@ nodes_no_bc_index(unique(bc_elements)) = [];
 piston_node = nodes_no_bc_index(dsearchn(nodes(nodes_no_bc_index,:),delaunayn(nodes(nodes_no_bc_index,:)),piston_xy)); % calculate closest node to piston point
 % piston_node = 50; % dsearchn(nodes,delaunayn(nodes),piston_xy); 
 
-%% Step 2: Optimize the existing mesh
+%% Step 2: Assign boundary material to the corresponding mesh nodes
 
 % assign specific materials to boundary domains wall, object, piston casing
 nodes_beta=zeros(Nn,1);
@@ -190,25 +190,15 @@ nodes_bc_material=[nodes_bc_material; nodes_bc_index(find(nodes_bc_xy(:,1)>=L/2 
 % nodes representing piston casing
 nodes_bc_material=[nodes_bc_material; nodes_bc_index(find(nodes_bc_xy(:,1)>0 & nodes_bc_xy(:,1)<L/2  & nodes_bc_xy(:,2)>0 & nodes_bc_xy(:,2)<W))];
 
-% nodes_bc_xy_piston_casing=nodes_bc_xy(find(nodes_bc_xy(:,1)>0 & nodes_bc_xy(:,1)<L/2  & nodes_bc_xy(:,2)>0 & nodes_bc_xy(:,2)<W),:);
-% nodes_bc_xy_piston_casing_area=find(nodes(:,1)>=min(nodes_bc_xy_piston_casing(:,1)) & nodes(:,1)<=max(nodes_bc_xy_piston_casing(:,1))  & nodes(:,2)>=min(nodes_bc_xy_piston_casing(:,2)) & nodes(:,2)<=max(nodes_bc_xy_piston_casing(:,2)));
-% test=nodes_bc_xy_piston_casing_area(not(ismember(nodes_bc_xy_piston_casing_area,nodes_bc_material{3})));
-
 for nf = 1:Nfreq
     nodes_beta(nodes_bc_material{nf})= beta(nf);
 end
-    
-% make room without interior objects
 
-% bc_elements_compelete=bc_elements;
-% bc_inside_index =unique([find(nodes(:,1)==0); find(nodes(:,2)==0)]); % find alle node indexes which have x or y == 0
-% bc_elements=bc_elements(unique([find(ismember(bc_elements(:,2),bc_inside_index)==1); find(ismember(bc_elements(:,1),bc_inside_index)==1)]),:); % only store nodes with this indexes in bc_elements
-
-%% Step 3: Build stiffness and mass matrix
+%% Step 3: Build and assemble stiffness and mass matrix
 fprintf('Build and assemble stiffness and mass matrix: \n');
 tic
 for e = 1:Ne
-    %% Compute elementary stiffness and mass matrices
+    %% Step 3a: Build elementary stiffness and mass matrices
     % shape functions for linear triangular with 3 nodes and Galerkin
     % approach
     % Get global x y position of all nodes of element
@@ -254,7 +244,7 @@ for e = 1:Ne
       % end
     % end
 
-    %% Step 4: Assemble global stiffness and mass matrix 
+    %% Step 4: Assemble to global stiffness and mass matrix 
     
     % positions where to assemble
     pos_e=sparse(Ne_Nn,Nn);
@@ -271,7 +261,7 @@ toc
 
 %% Solving the FEM system to get sound pressure in room
 
-V = zeros(Nn,length(w));  % normalized squared sound pressure in dB
+V = zeros(Nn,length(w));  % vector for sound pressure level at nodes in dB
 for nf=1:Nfreq
     % Get current angular frequency
     w_n = w(nf);

@@ -92,7 +92,7 @@ if(model_Z_by_alpha)
     end
 end
 
-%% Room modes calculation with analytic approach for rectangular room:
+%% Analytical room modes calculation for comparision of FEM results and theoretical results for rectangular rooms:
 % Vorländer, M. (2008). Auralization: Fundamentals of Acoustics, Modelling, Simulation,
 % Algorithms and Acoustic Virtual Reality. Berlin Heidelberg: Springer Verlag, p. 55.
 [x_min_bc,y_min_bc,y_max_bc,x_max_bc,S]=find_limits(Nn,x_no,y_no); % get room wall positions
@@ -147,7 +147,7 @@ for nf=1:length(w)
     end
 end
 
-%% Approximated number of elements per wavelength calculation
+%% Calcuation of the approximated number of elements per wavelength
 S_e_average=L*W/Ne; % Average area of an element (rough approximation)
 approx_average_length_element = sqrt(S_e_average*2);
 elements_per_lamda_min= lamda_min/ approx_average_length_element;
@@ -174,7 +174,7 @@ nodes_no_bc_index(unique(bc_elements)) = [];
 piston_node = nodes_no_bc_index(dsearchn(nodes(nodes_no_bc_index,:),delaunayn(nodes(nodes_no_bc_index,:)),piston_xy)); % calculate closest node to piston point
 % piston_node = 50; % dsearchn(nodes,delaunayn(nodes),piston_xy); 
 
-%% Step 2: Optimize the existing mesh
+%% Step 2: Assign boundary material to the corresponding mesh nodes
 
 % assign specific materials to boundary domains wall, object, piston casing
 nodes_beta=zeros(Nn,1);
@@ -190,19 +190,9 @@ nodes_bc_material=[nodes_bc_material; nodes_bc_index(find(nodes_bc_xy(:,1)>=L/2 
 % nodes representing piston casing
 nodes_bc_material=[nodes_bc_material; nodes_bc_index(find(nodes_bc_xy(:,1)>0 & nodes_bc_xy(:,1)<L/2  & nodes_bc_xy(:,2)>0 & nodes_bc_xy(:,2)<W))];
 
-% nodes_bc_xy_piston_casing=nodes_bc_xy(find(nodes_bc_xy(:,1)>0 & nodes_bc_xy(:,1)<L/2  & nodes_bc_xy(:,2)>0 & nodes_bc_xy(:,2)<W),:);
-% nodes_bc_xy_piston_casing_area=find(nodes(:,1)>=min(nodes_bc_xy_piston_casing(:,1)) & nodes(:,1)<=max(nodes_bc_xy_piston_casing(:,1))  & nodes(:,2)>=min(nodes_bc_xy_piston_casing(:,2)) & nodes(:,2)<=max(nodes_bc_xy_piston_casing(:,2)));
-% test=nodes_bc_xy_piston_casing_area(not(ismember(nodes_bc_xy_piston_casing_area,nodes_bc_material{3})));
-
 for nf = 1:Nfreq
     nodes_beta(nodes_bc_material{nf})= beta(nf);
 end
-    
-% make room without interior objects
-
-% bc_elements_compelete=bc_elements;
-% bc_inside_index =unique([find(nodes(:,1)==0); find(nodes(:,2)==0)]); % find alle node indexes which have x or y == 0
-% bc_elements=bc_elements(unique([find(ismember(bc_elements(:,2),bc_inside_index)==1); find(ismember(bc_elements(:,1),bc_inside_index)==1)]),:); % only store nodes with this indexes in bc_elements
 
 %% Step 3: Build and assemble stiffness and mass matrix
 fprintf('Build and assemble stiffness and mass matrix: \n');
@@ -269,9 +259,9 @@ for e = 1:Ne
 end
 toc
 
-%% Solving the FEM system to get sound pressure in room
+%% Solve the FEM system
 
-V = zeros(Nn,length(w));  % vector for sound pressure level at nodes in dB
+V = zeros(Nn,length(w));  % out vector for sound pressure level  in dB at nodes
 for nf=1:Nfreq
     % Get current angular frequency
     w_n = w(nf);
