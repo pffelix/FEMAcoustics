@@ -1,5 +1,6 @@
 % FEM 2-D Scalar Analysis
 % 2D Acoustics: Model sound pressure level in a room excited by a piston
+% Galerkin method is used, linear triangular shape functions
 % Plot: geometry, mesh, boundary nodes, and field
 
 % Load ASCII data: mesh, boundary nodes, domains (COMSOL is used as a mesh
@@ -23,14 +24,6 @@ set(gcf,'color','w');
 % Parameters definition
 % **************************************************************
 
-% sound pressure level werte falsch mit quadrat
-%
-
-%
-
-%
-%
-
 %% Acoustical constants
 rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
@@ -39,9 +32,9 @@ p_0 = 2e-5; % reference sound pressure (hearing threshold 1kHz)
 Z0 = rho0 * c0; % Specific impedance of fluid
 
 %% Source parameters
-freq = [68]; % Sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength at given model)
+freq = [68,120]; % Sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength at given model)
 u_n = repelem(1e-7,length(freq)); % "Strenght of sound source": expressed by particle displacement in m (can be a vector corresponding to every frequency of excitation)
-piston_xy = [0.6,2]; %  x and y position of source in m ( at loudspeaker location [0.6,2])
+piston_xy = [0.6,2]; % x and y position of source in m (original source location [0.6,2])
 
 %% Boundaries paramters
 % Model boundaries either by practial measured absorption coefficients or by physical more correct impedances under assumption of local reaction
@@ -49,17 +42,16 @@ model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coef
 % Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
 
 % either:
-alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
-% For experts (acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
-% set model_Z_by_alpha==false -> 
+alpha = [0.9,0.1,0.1]; % absorption coefficent at wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
 
-% or:
+% or (for experts):
 Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, piston casing (expresses: sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + i*]0,inf[ )
-
 
 %% Solver parameters
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-video = 1;
+video = true; % false: show steady state sound pressure field, true: show sound propagation as video (plot function for each frame is quite slow, so takes time to compute)
+video_time = 50; % set movie time in milliseconds
+video_framerate = 2; % set the number of frames per millisecond to calculate
 % *************************************************************************
 %% Non-FEM calculations
 %% Acoustical properties calculation
@@ -199,8 +191,9 @@ fprintf('Build and assemble stiffness and mass matrix: \n');
 tic
 for e = 1:Ne
     %% Step 3a: Build elementary stiffness and mass matrices
-    % shape functions for linear triangular with 3 nodes and Galerkin
-    % approach
+    % Shape functions: linear triangular with 3 nodes
+    % Galerkin method
+    
     % Get global x y position of all nodes of element
     e_n_xy = zeros(Ne_Nn,N_dim);
     f = zeros(Ne_Nn,1);
@@ -320,14 +313,9 @@ for nf=1:Nfreq
 
     fprintf('Plot field: \n');
     tic
-    % calculate sound pressure level of steady state field
-    P_magnitude = abs(Vc); % sound pressure magnitude
     P_phase = angle(Vc); % sound pressure phase
     % P_real=real(P_magnitude.*exp(1i*P_phase*w_n));
-    L_P_absolut_dB = 20*log10((P_magnitude/sqrt(2))/p_0)'; % absolut RMS sound pressure level in dB
-    L_P_normalized_dB = 20*log10((P_magnitude/sqrt(2))/max(P_magnitude/sqrt(2))); % normalized RMS sound pressure level in dB
-    L_P_average_dB = 20*log10(mean(P_magnitude/sqrt(2))/p_0); % average RMS sound pressure level in room in dB
-
+    
 %     % time dependent evaluation
 %     t_vector_nr=10;
 %     P_exp_t = ((P_magnitude.*exp(1i*P_phase*w_n))'*(exp((w_n*linspace(0,1,t_vector_nr))*-1i)));
@@ -336,16 +324,51 @@ for nf=1:Nfreq
 %     P_exp_t_phase=angle(P_exp_t);
 %     L_P_t_dB = 20*log10(P_exp_t_real(:,1).^2/p_0);
 
-    % assign field to plot
-    V(:,1)=L_P_absolut_dB(:,1);
+    if video == true
+        frames_nr = video_time*video_framerate; % number of frames to plot
+        t_video = linspace(0,video_time/1000,frames_nr); % Time vector for frames in seconds
+        Vc_t = (Vc'*exp(-1i*t_video*w(nf)))'; % Complex sound pressure pointer at time t
+        P_real_t = real(Vc_t); % Sound pressure at time t
+        P_out=P_real_t; % Sound pressure at time t
+    else
+        P_magnitude = abs(Vc); % sound pressure magnitude
+        P_out = P_magnitude/sqrt(2); % Root mean squared (RMS) sound pressure
+        frames_nr = 1; % number of frames to plot
+    end
+    
+    for plot_n=1:frames_nr
+        % calculate sound pressure level of steady state field
+        L_P_absolut_dB = 10*log10((P_out(plot_n,:).^2/p_0.^2))'; % absolut sound pressure level in dB
+        L_P_normalized_dB = 10*log10((P_out(plot_n,:).^2)/max(P_out(plot_n,:).^2))'; % normalized sound pressure level in dB
+        L_P_average_dB = 10*log10(mean(P_out(plot_n,:).^2)/p_0.^2)'; % average sound pressure level in room in dB
 
-    if 1 % Field Plot
-    % V2=Field;
-    fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
-    set_figure_1;
-    find_min_max;
-    field_plot;
-    geometry_plot;
+        % assign which field value to plot
+        V(:,1)=L_P_absolut_dB(:,1);
+        fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
+        set_figure_1;
+        find_min_max;
+        field_plot;
+        geometry_plot;
+        
+        if video == true
+        % save figure for video
+            newtitle = get(title_plot,'String');
+            newtitle{end+1}=['Time: ',num2str(t_video(plot_n)*1000,0),' ms'];
+            set(title_plot,'String',newtitle)
+            video_matrix(plot_n) = getframe(gcf);
+            close % close figure of current frame
+        end
+    end
+    if video == true
+        % play video
+        movie(video_matrix,frame_rate,3)
+        % save video
+        v = VideoWriter(strcat('soundwave_',int2str(round(w(nf)/2/pi)),'Hz','.avi'));
+        v.FrameRate = 1;
+        v.Quality = 99;
+        open(v);
+        writeVideo(v,video_matrix);
+        close(v);
     end
     toc
 end

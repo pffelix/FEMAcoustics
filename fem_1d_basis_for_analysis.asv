@@ -1,7 +1,5 @@
 % FEM 1-D Scalar Analysis
-% 1D Acoustics: Model sound pressure level in a waveguide with piston at
-% one end and wall at other end 
-% Galerkin method is used, choose between linear or quadratic shape functions
+% 1D Acoustics: Model sound pressure level in a waveguide with piston at one end and wall at other end
 % Plot: geometry, mesh, boundary nodes, and field
 
 set(gcf,'color','w');
@@ -10,6 +8,31 @@ set(gcf,'color','w');
 %==================================================================
 % Parameters definition
 % **************************************************************
+
+%% Acoustical constants
+rho0 = 1.2; % Air density in kg/m^3
+c0 = 340; % Speed of sound in m/s
+air_damp = 0.00; % Damping by the cavity air
+p_0 = 2e-5; % reference root man squared sound pressure (hearing threshold 1kHz)
+Z0 = rho0 * c0; % Specific impedance of air
+
+%% Source parameters
+freq = [68,120]; % Sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength at given model)
+u_n = repelem(1e-7,length(freq)); % "Strenght of sound source": expressed by particle displacement in m (can be a vector corresponding to every frequency of excitation)
+piston_xy = [0.6,2]; % x and y position of source in m (original source location [0.6,2])
+
+%% Boundaries paramters
+% Model boundaries either by practial measured absorption coefficients or by physical more correct impedances under assumption of local reaction
+model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
+% Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
+
+% either:
+alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
+% For experts (acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
+% set model_Z_by_alpha==false -> 
+
+% or:
+Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, piston casing (expresses: sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + i*]0,inf[ )
 
 % Generate mesh data: mesh, boundary nodes, domains 
 L=1; % Length of the tube
@@ -25,19 +48,16 @@ p_0 = 2e-5; % reference root man squared sound pressure (hearing threshold 1kHz)
 Z0 = rho0 * c0; % Specific impedance of air
 
 % Piston source parameters
-freq = [2:2:1000]; % Frequencies piston excitation in Hz
-u_n = repelem(1,length(freq)); % Particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
+freq = [2:2:1000]; % Frequencies piston excitation in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength)
+u_n = repelem(1,length(freq)); % sound particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
 
-% Boundary paramters
-% Model boundaries either by practial measured absorption coefficients or by physical more correct impedances under assumption of local reaction
-model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
+% Boundary material paramters
+model_Z_by_alpha = false ; % model acoustical impedances by practical more commonly measured random incidence absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
 % Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
-
-% either:
-alpha = [0.9,0.1,0.1]; % absorption coefficent at wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
-
-% or (for experts):
-Z = Z0*100; % acoustical impedance at wall, scattering object, piston casing (expresses: sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + i*]0,inf[ )
+alpha = 0.9; % absorption coefficent at boundary (sound energy absorbed per reflection in percent, value range ]0,1[)
+% For experts ( acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
+% set model_Z_by_alpha==false -> 
+Z = Z0*100; % acoustical impedance at boundary (=sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + ]0,inf[*i )
 
 % *************************************************************************
 
@@ -84,10 +104,10 @@ for i=1:length(boundary_x)
 end
 %% Compute elementary matrices
 switch shape_type
-    case 1  % linear shape functions
+    case 1  
         K_e = [1,-1;-1,1]*1/h;
         M_e = [2,1;1,2]*h/6/c0^2;
-    case 2 % quadratic shape functions
+    case 2
         K_e = [7,-8,1;-8,16,-8;1,-8,7]/(3*h);
         M_e = [4,2,-1;2,16,2;-1,2,4]*h/30/c0^2;
 end

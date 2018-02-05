@@ -1,5 +1,4 @@
 % set Figure properties
-% figure(1);
 % x_min=min(x_no);
 % x_max=max(x_no);
 % y_min=min(y_no);

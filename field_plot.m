@@ -122,4 +122,4 @@ if (model_Z_by_alpha)
 else
     title_3 = ['specific impedance wall Z/Z0 = ',num2str(1/beta(1)/Z0,'%0.0f')];
 end
-title({title_1;title_3;title_2},'fontsize',20)
+title_plot = title({title_1;title_3;title_2},'fontsize',20);
