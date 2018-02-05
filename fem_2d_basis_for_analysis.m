@@ -23,31 +23,37 @@ set(gcf,'color','w');
 %
 %
 
-% Acoustical constants
+%% Acoustical constants
 rho0 = 1.2; % Air density in kg/m^3
 c0 = 340; % Speed of sound in m/s
 air_damp = 0.00; % Damping by the cavity air
 p_0 = 2e-5; % reference sound pressure (hearing threshold 1kHz)
 Z0 = rho0 * c0; % Specific impedance of fluid
 
-% Piston source parameters
-freq = [34]; % Frequencies piston excitation in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength)
-u_n = repelem(1/10000000,length(freq)); % sound particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
-piston_xy = [0.6,2]; %  Piston position x and y in m ( at loudspeaker location [0.6,2])
+%% Piston sound source parameters
+freq = [68]; % Sound source frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less then 6 elements per wavelength at given model)
+u_n = repelem(1e-7,length(freq)); % "Strenght of sound source": expressed by particle displacement in m (can be a vector corresponding to every frequency of excitation)
+piston_xy = [0.6,2]; %  x and y position of source in m ( at loudspeaker location [0.6,2])
 % interesting plots 
-% # freq=34 (x-axial (n_x=1) mode, very strong standing wave)
-% # freq=68 (x-axial (n_x=2), even with piston sound pressure does not increase significantly at left wave valley )
-% # freq=110 (tangential (2,2) mode, very strong nodes and increases of sound pressure in corners)
+% # freq=34 (x-axial mode (n_x=1), very strong resonance)
+% # freq=68 (x-axial mode (n_x=2), even with piston sound pressure does not increase significantly at left wave node )
+% # freq=110 (tangential (2,2) mode, very strong nodes and increase of sound pressure in corners)
 % # By increasing the frequency the wave equation allows more resonances and so the sound field gets more homogenous (diffuse)
 % # By increasing the absorption degrees the standing waves get less distinct (the Q factors of the resonances widen)
 
-% Boundaries material paramters
-model_Z_by_alpha = true ; % model acoustical admittances by practical more commonly measured random incidence absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
+%% Boundaries material paramters:
+% Model either by practial measured absorption coefficients or more correct impedance boundaries
+model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
 % Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
-alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (sound energy absorbed per reflection in percent, value range ]0,1[)
+
+% either:
+alpha = [0.9,0.1,0.1]; % absorption coefficent wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
 % For experts (acoustical impedance Z=p/v respectively Admittance A=v/p in the praxis normally not measured/available):
 % set model_Z_by_alpha==false -> 
-Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, piston casing (=sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + ]0,inf[*i )
+
+% or:
+Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, piston casing (expresses: sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + i*]0,inf[ )
+
 
 % FEM solver
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
