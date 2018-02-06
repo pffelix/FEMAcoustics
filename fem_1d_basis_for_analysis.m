@@ -1,8 +1,10 @@
 % FEM 1-D Scalar Analysis
 % 1D Acoustics: Model sound pressure level in a waveguide with piston at
-% one end and wall at other end 
-% Galerkin method is used, choose between linear or quadratic shape functions
-% Plot: geometry, mesh, boundary nodes, and field
+% one end and wall at other end for multiple frequencies
+% Input: Frequency dependent source source conditions and wall boundary condition
+% FEM approach: Galerkin method is used, choose between linear or quadratic shape functions
+% Plot: RMS sound pressure as logrithmic unit sound pressure level (SPL) 
+% with 2e-5 Pa as reference (hearing threshold)
 
 set(gcf,'color','w');
 
@@ -28,9 +30,9 @@ Z0 = rho0 * c0; % Specific impedance of air
 freq = [2:2:1000]; % Frequencies piston excitation in Hz
 u_n = repelem(1,length(freq)); % Particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
 
-% Boundary paramters
-% Model boundaries either by practial measured absorption coefficients or by physical more correct impedances under assumption of local reaction
-model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coefficients with Mommertz's (1996) method assuming phase difference p/v at boundaries is zero
+% Boundary paramter
+% Model boundary under assumption of frequency independence either by practial measured absorption coefficient or by physical more correct acoustical impedance under assumption of local reaction
+model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coefficients with Mommertz's (1996) method assuming the phase difference between sound pressure and normal particle velocity at boundaries is zero
 % Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
 
 % either:
@@ -60,7 +62,7 @@ if(model_Z_by_alpha)
     fprintf('Modelled specific acoustical impedance (Mommertz, 1996) for \n');
     for mat = 1:Nmat
         fprintf('boundary at x = %.3f with absorption coefficient = %.2f:\n', [boundary_x(mat) alpha(mat)])
-        beta(mat)=1/(Mommertz(alpha(mat))*Z0);
+        beta(mat)=1/(conversion_alpha_to_Z(alpha(mat))*Z0);
         fprintf('Z/Z0 = %.0f \n',(1/beta(mat))/Z0);
     end
 end
@@ -127,7 +129,7 @@ end
 figure(1)
 plot(freq,10*log10(L_P_average_dB(:,1:length(freq))),'LineWidth', 2, 'DisplayName',['Z/Z0 = ',num2str(1/beta(1)/Z0,'%0.0f')])
 hold on
-title_1=['Sound pressure level SPL in waveguide'];
+title_1=['RMS Sound pressure level SPL in waveguide'];
 % if (model_Z_by_alpha)
     % title_2 = ['wall absorption coefficient = ',num2str(alpha(1),'%0.2f'), '; modelled specific wall impedance Z/Z0 = ',num2str(1/beta(1)/Z0,'%0.0f')];
 % else
@@ -135,5 +137,5 @@ title_1=['Sound pressure level SPL in waveguide'];
 % end
 % title({title_1;title_2})
 xlabel('Frequency in Hz','fontweight','bold','fontsize',16);
-ylabel('Sound pressure level SPL','fontweight','bold','fontsize',16);
+ylabel('RMS Sound pressure level SPL','fontweight','bold','fontsize',16);
 % legend(gca,'show')
