@@ -49,8 +49,8 @@ Z = [Z0*100,Z0*100,Z0*100]; % acoustical impedance at wall, scattering object, p
 
 %% Solver parameters
 solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
-video = true; % false: show steady state sound pressure field, true: show sound propagation as video (plot function for each frame is quite slow, so takes time to compute)
-video_time = 50; % set movie time in milliseconds
+video = true; % false: show steady state sound pressure field to analyse resonances, true: show sound propagation as video (plotting each frame is computationally slow with the standard plot function)
+video_time = 100; % set movie time in milliseconds
 video_framerate = 2; % set the number of frames per millisecond to calculate
 % *************************************************************************
 %% Non-FEM calculations
@@ -237,7 +237,7 @@ for e = 1:Ne
       % end
     % end
 
-    %% Step 4: Assemble to global stiffness and mass matrix 
+    %% Step 3b: Assemble to global stiffness and mass matrix 
     
     % positions where to assemble
     pos_e=sparse(Ne_Nn,Nn);
@@ -252,10 +252,9 @@ for e = 1:Ne
 end
 toc
 
-%% Solve the FEM system
+%% Step 4: Solve FEM matrices to get sound pressure at nodes
 
-V = zeros(Nn,length(w));  % out vector for sound pressure level  in dB at nodes
-for nf=1:Nfreq
+for nf=1:Nfreq % for every frequency
     % Get current angular frequency
     w_n = w(nf);
     fprintf('Frequency %.0f Hz: \n',w(nf));
@@ -272,7 +271,7 @@ for nf=1:Nfreq
 
 
 
-    % integrate impedance conditions for frequency into damping matrix
+    % integrate impedance conditions for current frequency into damping matrix
     A = sparse(Nn,Nn);
     Boundary_vector_non_unique = [bc_elements(:,2);bc_elements(:,1)];
     Boundary_vector = unique([bc_elements(:,2);bc_elements(:,1)]);
@@ -286,10 +285,9 @@ for nf=1:Nfreq
     f(piston_node) = w_n^2*rho0*u_n(nf);
 
     % Add global stiffness, mass and boundary matrix to one matrix 
-    % representing the left side of the weak form of the Helmholtz equation
-    % A = K/rho0 - w_n^2*M/((rho0*c0^2)*(1+1i*air_damp))+1i*w_n*C/(rho0*c0);
     Matrix = K - w_n^2*M/(1+1i*air_damp)+1i*w_n*A;
 
+    % solve the system of equations numerical
     switch solver
             % ***************************
     case 1  % direct sparse matrix solver
@@ -310,19 +308,9 @@ for nf=1:Nfreq
     end    
 
     toc
-
-    fprintf('Plot field: \n');
+    %% Step 5: Plot sound pressure field
+    fprintf('Plot sound pressure field: \n');
     tic
-    P_phase = angle(Vc); % sound pressure phase
-    % P_real=real(P_magnitude.*exp(1i*P_phase*w_n));
-    
-%     % time dependent evaluation
-%     t_vector_nr=10;
-%     P_exp_t = ((P_magnitude.*exp(1i*P_phase*w_n))'*(exp((w_n*linspace(0,1,t_vector_nr))*-1i)));
-%     P_exp_t_real = real(P_exp_t);
-%     P_exp_t_magnitude=abs(P_exp_t);
-%     P_exp_t_phase=angle(P_exp_t);
-%     L_P_t_dB = 20*log10(P_exp_t_real(:,1).^2/p_0);
 
     if video == true
         frames_nr = video_time*video_framerate; % number of frames to plot
@@ -337,13 +325,14 @@ for nf=1:Nfreq
     end
     
     for plot_n=1:frames_nr
+        fprintf('Frame number %.0f: \n',plot_n);
         % calculate sound pressure level of steady state field
         L_P_absolut_dB = 10*log10((P_out(plot_n,:).^2/p_0.^2))'; % absolut sound pressure level in dB
         L_P_normalized_dB = 10*log10((P_out(plot_n,:).^2)/max(P_out(plot_n,:).^2))'; % normalized sound pressure level in dB
         L_P_average_dB = 10*log10(mean(P_out(plot_n,:).^2)/p_0.^2)'; % average sound pressure level in room in dB
 
         % assign which field value to plot
-        V(:,1)=L_P_absolut_dB(:,1);
+        V=L_P_absolut_dB;
         fig1=figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
         set_figure_1;
         find_min_max;
@@ -353,18 +342,21 @@ for nf=1:Nfreq
         if video == true
         % save figure for video
             newtitle = get(title_plot,'String');
-            newtitle{end+1}=['Time: ',num2str(t_video(plot_n)*1000,0),' ms'];
+            newtitle{end+1}=['Time: ',num2str(t_video(plot_n)*1000,	'%.0f'),' ms'];
             set(title_plot,'String',newtitle)
             video_matrix(plot_n) = getframe(gcf);
-            close % close figure of current frame
+            if (plot_n ~= frames_nr)
+                close % close figure of current frame
+            end
         end
     end
     if video == true
+        video_frame_rate=1;
         % play video
-        movie(video_matrix,frame_rate,3)
+        movie(gcf,video_matrix,video_frame_rate,3)
         % save video
         v = VideoWriter(strcat('soundwave_',int2str(round(w(nf)/2/pi)),'Hz','.avi'));
-        v.FrameRate = 1;
+        v.FrameRate = video_frame_rate;
         v.Quality = 99;
         open(v);
         writeVideo(v,video_matrix);
@@ -374,10 +366,6 @@ for nf=1:Nfreq
 end
 
 
-% for plot_i = 1:t_vector_nr
-    % L_P_t_dB = 20*log10(L_P_average(:,plot_i).^2/p_0);
-    % V(:,nw)=L_P_t_dB(:,1);
-% end
 
 % %% strg r, t
 % if 1 % Geometry Plot
