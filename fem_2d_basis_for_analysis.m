@@ -36,8 +36,8 @@ p_0 = 2e-5; % reference sound pressure (hearing threshold 1kHz) in Pa
 Z0 = rho0 * c0; % Specific impedance of fluid in Pa·s/m
 
 %% Source parameters
-freq = [110]; % Sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less than 6 elements per wavelength)
-u_n = [1e-5,1e-5]; % Particle displacement in m at every frequency of piston excitation (vector corresponding to every frequency of excitation, adapt to change radiated sound power)
+freq = [500;200]; % Radial sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less than 6 elements per wavelength)
+u_n = [1e-5,0.120035]; % Particle displacement in m by source excitation (vector corresponding to every frequency of excitation, adapt to change strength of sound)
 source_xy = [0.6,2]; % x and y position of source in m (original source location [0.6,2])
 
 %% Boundaries parameters
@@ -46,7 +46,7 @@ model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coef
 % Literature: Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
 
 % A parameter matrix is needed with dimension nf x 3 (nf = number of source frequencies) 
-% specifying for every frequency 3 boundary conditions (wall, scattering object, piston casing)
+% specify for every frequency 3 boundary condition material parameters (wall, scattering object, piston casing)
 % either by:
 alpha = [0.9,0.1,0.1;
         0.2,0.1,0.1]; % absorption coefficient at wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent at boundary, value range: ]0,1[)
@@ -270,7 +270,8 @@ for nf=1:Nfreq
         for p = 1:Nn
            M1(p,p) = diag_A(p); 
         end
-        [Vc,flag,relres,iter] = gmres(Matrix,f,[],1e-7,Nn,M1);
+        [Vp,flag,relres,iter] = gmres(Matrix,f,[],1e-7,Nn,M1);
+        Vc = Vp';
     end    
 
     toc
@@ -297,7 +298,7 @@ for nf=1:Nfreq
         % (absolut scale)
         L_P_absolut_dB = 10*log10((P_out(plot_n,:).^2/p_0.^2))'; % sound pressure level (SPL) in dB
         % L_P_normalized_dB = 10*log10((P_out(plot_n,:).^2)/max(P_out(plot_n,:).^2))'; % normalized sound pressure level (SPL) in dB
-        L_P_average_dB = 10*log10(mean(P_out(plot_n,:).^2)/p_0.^2)'; % average sound pressure level (SPL) in room in dB
+        % L_P_average_dB = 10*log10(mean(P_out(plot_n,:).^2)/p_0.^2)'; % average sound pressure level (SPL) in room in dB
 
         % Plot the field with given standard plot function
         V = L_P_absolut_dB;

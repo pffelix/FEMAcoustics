@@ -115,7 +115,6 @@ cb_values_str=strcat(num2str(cb_values,'%0.0f\n'),' dB');
 c=colorbar('South','XTickLabel',cb_values_str,'FontSize',14);
 c.Position=[0.1,0.05,0.83,0.05];
 title_1=['RMS sound pressure level (SPL) for ', num2str(freq(nf),'%0.0f\n'),' Hz'];
-% title_2 = ['average SPL in room = ',num2str(L_P_average_dB,'%0.0f'),' dB'];
 if (model_Z_by_alpha)
     title_2 = ['absorption coefficient wall = ',num2str(alpha(nf,1),'%0.2f')];
 else
