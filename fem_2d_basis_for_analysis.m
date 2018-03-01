@@ -4,13 +4,13 @@
 % Input Parameters: Frequency dependent source conditions and boundary conditions
 % FEM approach: Galerkin method is used, linear triangular shape functions
 % Plot: geometry, mesh, boundary nodes, and sound pressure at all nodes expressed
-% as logarithmic unit sound pressure level (SPL) with 2e-5 Pa as reference(hearing threshold)
+% as logarithmic unit sound pressure level (SPL) with 2e-5 Pa as reference (hearing threshold)
 
 % interesting plots:
-% # freq=34, Absorption degree low: first x-axial room resonance (also called x-axial room mode)
-% # freq=68, Absorption degree low: second x-axial resonance, strong local pressure node in front of sound source where sound field can hardly be excited
-% # freq=110, Absorption degree low: tangential (2,2) mode, very strong anti-nodes and increase of sound pressure in corners
-% # By increasing the absorption degrees at the above examples or reducing the acoustical impedance of the boundaries the resonances get less distinct (Q factors of the resonances decrease)
+% # freq=34, wall absorption coefficient low: first x-axial room resonance (also called x-axial room mode)
+% # freq=68, wall absorption coefficient low: second x-axial resonance, strong local pressure node in front of sound source where sound field can hardly be excited
+% # freq=110, wall absorption coefficient low: tangential (2,2) mode, very strong anti-nodes and increase of sound pressure in corners
+% # By increasing the wall absorption coefficient at the above examples or reducing the corresponding acoustical impedance the resonances get less distinct (Q factors of the resonances decrease)
 % # By further increasing the source frequency more and more resonances are locally excited and the sound field gets more homogeneous (diffuse)
 
 
@@ -18,10 +18,6 @@
 % generator)
 load_data;
 set(gcf,'color','w');
-
-% to do:
-%  delete git, initialize params
-
 
 %% 
 %==================================================================
@@ -36,8 +32,8 @@ p_0 = 2e-5; % reference sound pressure (hearing threshold 1kHz) in Pa
 Z0 = rho0 * c0; % Specific impedance of fluid in Pa·s/m
 
 %% Source parameters
-freq = [500;200]; % Radial sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less than 6 elements per wavelength)
-u_n = [1e-5,0.120035]; % Particle displacement in m by source excitation (vector corresponding to every frequency of excitation, adapt to change strength of sound)
+freq = [400]; % Radial sound source (piston) frequency in Hz (can be a frequency vector, should be maximum 500 Hz otherwise less than 6 elements per wavelength)
+u_n = [1e-5]; % Particle displacement in m by source excitation (vector corresponding to every frequency of excitation, adapt to change strength of sound)
 source_xy = [0.6,2]; % x and y position of source in m (original source location [0.6,2])
 
 %% Boundaries parameters
@@ -48,18 +44,18 @@ model_Z_by_alpha = true ; % true: model acoustical impedances by absorption coef
 % A parameter matrix is needed with dimension nf x 3 (nf = number of source frequencies) 
 % specify for every frequency 3 boundary condition material parameters (wall, scattering object, piston casing)
 % either by:
-alpha = [0.9,0.1,0.1;
-        0.2,0.1,0.1]; % absorption coefficient at wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent at boundary, value range: ]0,1[)
+alpha = [0.9,0.9,0.1]; % absorption coefficient at wall, scattering object, piston casing (expresses: sound energy absorbed per reflection in percent at boundary, value range: ]0,1[)
 
 % or (if model_Z_by_alpha = false):
 Z = [Z0*100,Z0*100,Z0*100]; % complex acoustical impedance at wall, scattering object, piston casing (expresses: sound pressure divided by normal particle velocity at boundary, value range: ]0,inf[ + 1i*]0,inf[ )
 
 %% Solver parameters
-solver = 1; % 1 - sparse matrix solver; 2 - GMRES iterative solver
+simplify_damping_matrix = false; % use only diagonal elements of damping matrix
+solver = 2; % 1 - sparse matrix solver; 2 - GMRES iterative solver
 
 %% Plotting parameters
 plot_propagation_video = false; % false: show steady state sound pressure field to analyse room resonances (faster), true: show sound propagation as video and make avi file (plotting for every frame is slow with standard plot function)
-propagation_video_time = 5; % set movie time in milliseconds (computationally recommended 5)
+propagation_video_time = 2; % set movie time in milliseconds (computationally recommended 5-20)
 propagation_video_framerate = 2; % set the number of frames per millisecond to calculate (computationally recommended 2)
 plot_geometry_mesh_boundary = false; % plot additional figures about geometry, mesh and boundary
 % *************************************************************************
@@ -71,10 +67,10 @@ plot_geometry_mesh_boundary = false; % plot additional figures about geometry, m
 %% Acoustical properties calculation
 
 % Piston sound source
-w=2*pi*freq; % calculate angular frequency of loudspeaker excitation frequency
+w = 2*pi*freq; % calculate angular frequency of loudspeaker excitation frequency
 Nfreq = length(freq); % number of frequencies
 lamda_min = c0/max(freq); % smallest wavelength in the room
-k0 = w /c0; % wave number
+k0 = w/c0; % wave number
 
 % Boundaries
 beta = 1./Z; % calculate admittances from impedances
@@ -240,12 +236,38 @@ for nf=1:Nfreq
     fprintf('Integrate boundaries and force vector and solve weak form: \n');
     tic
 
-    % integrate boundary conditions into a damping matrix A
-    A = zeros(Nn,Nn);
-    Boundary_vector = unique(bc_elements);
-    diagIdx = 1:Nn+1:Nn*Nn; %get index of all diagonal elements in matrix with same shape as A
-    A(diagIdx(Boundary_vector)) = nodes_beta(Boundary_vector,nf)*rho0; % assign admittances to diagonal elements
+    if(simplify_damping_matrix == false)
+        %% Global damping matrix
+        A = sparse( Nn , Nn );
+        for b = 1:Nb
+            % elementary damping matrix
+            nodes_at_b = bc_elements(b,:);
+            nodes_at_b_xy = nodes(nodes_at_b,:);
+            h = sqrt((nodes_at_b_xy(1,1)-nodes_at_b_xy(2,1))^2+(nodes_at_b_xy(1,2)-nodes_at_b_xy(2,2))^2);
+            A_b = [2,1;1,2]*h*beta(nf)*rho0; % assume both nodes at boundary element have same impedance
 
+
+            % Assemble to global damping matrix 
+
+            % positions where to assemble
+            pos_b = sparse(Ne_Nn-1,Nn);
+            for b_n = 1:Ne_Nn-1
+                node_number = bc_elements(b,b_n);
+                pos_b(b_n,node_number) = 1;
+            end
+
+            % assembling
+
+            A = A + pos_b'*A_b*pos_b; % A Damping Matrix
+        end
+    else
+        % integrate boundary conditions into a damping matrix A
+        A = zeros(Nn,Nn);
+        Boundary_vector = unique(bc_elements);
+        diagIdx = 1:Nn+1:Nn*Nn; %get index of all diagonal elements in matrix with same shape as A
+        A(diagIdx(Boundary_vector)) = nodes_beta(Boundary_vector,nf)*rho0; % assign admittances to diagonal elements
+    end
+    
     % Build force vector
     f = sparse(Nn,1); 
     f(piston_node) = w_n^2*rho0*u_n(nf);
@@ -268,7 +290,7 @@ for nf=1:Nfreq
         M1 = sparse(Nn,Nn);
         diag_A = diag(Matrix);
         for p = 1:Nn
-           M1(p,p) = diag_A(p); 
+           M1(p,p) = diag_A(p);
         end
         [Vp,flag,relres,iter] = gmres(Matrix,f,[],1e-7,Nn,M1);
         Vc = Vp';
@@ -285,7 +307,7 @@ for nf=1:Nfreq
         t_video = linspace(0,propagation_video_time/1000,frames_nr); % Time vector for frames in seconds
         Vc_t = (Vc'*exp(-1i*t_video*w(nf)))'; % Complex sound pressure pointer at time t
         P_real_t = real(Vc_t); % Sound pressure at time t
-        P_out=P_real_t; % Sound pressure at time t
+        P_out = P_real_t; % Sound pressure at time t
     else
         P_magnitude = abs(Vc); % sound pressure magnitude
         P_out = P_magnitude/sqrt(2); % Root mean squared (RMS) sound pressure
@@ -328,7 +350,7 @@ for nf=1:Nfreq
         % play video
         movie(gcf,video_matrix,video_frame_rate,3)
         % save video
-        v = VideoWriter(strcat('soundwave_',int2str(round(freq(nf))),'Hz','.avi'));
+        v = VideoWriter(strcat('soundfield_',int2str(round(freq(nf))),'Hz','.avi'));
         v.FrameRate = video_frame_rate;
         v.Quality = 90;
         open(v);
@@ -344,6 +366,8 @@ end
 % Plot geometry, mesh, boundary nodes
 % **************************************************************
 if plot_geometry_mesh_boundary == true
+    fprintf('Plot geometry, mesh and boundary: \n');
+    tic
     if 1 % Geometry Plot
     figure('Position',[Px1 Py1 Px2 Py2],'Color',[1 1 1]);
     set_figure_1;
@@ -363,5 +387,6 @@ if plot_geometry_mesh_boundary == true
     geometry_plot;
     plot_boundary_nodes;
     end
+    toc
 end
 % *************************************************************************

@@ -28,7 +28,7 @@ piston_x = 0; %  piston source x-position (0<=x<=L)
 
 % Piston source parameters
 freq = [2:2:1000]; % Frequencies piston excitation in Hz
-u_n = repelem(1,length(freq)); % Particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
+u_n = repelem(1e-6,length(freq)); % Particle displacement in m at every frequency of piston excitation (adapt to change radiated sound power)
 
 % Boundary paramter
 % Model boundary (under assumption of frequency independence) either by practical measured absorption coefficient (simpler) or by physical more correct acoustical impedance under assumption of local reaction
@@ -36,15 +36,14 @@ model_Z_by_alpha = false ; % true: model acoustical impedances by absorption coe
 % Literature: Mommertz, E. (1996): Untersuchung akustischer Wandeigenschaften und Modellierung der Schallrückwürfe in der binauralen Raumsimulation. Dissertation. RWTH Aachen, Fakultät für Elektrotechnik und Informationstechnik, S. 122. 
 
 % either:
-alpha = 0.9; % absorption coefficient at wall (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
+alpha = 0.3; % absorption coefficient at wall (expresses: sound energy absorbed per reflection in percent, value range: ]0,1[)
 
 % or (if model_Z_by_alpha = false):
-Z = Z0*100; % complex acoustical impedance at wall (expresses: sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + 1i*]0,inf[ )
+Z = Z0*10; % complex acoustical impedance at wall (expresses: sound pressure divided by particle velocity at boundary, value range: ]0,inf[ + 1i*]0,inf[ )
 
 % *************************************************************************
 
 %% Acoustical properties calculation
-
 % Piston source
 w = 2*pi*freq; % Calculate angular frequency of loudspeaker excitation frequency
 Nfreq = length(freq); % number of frequencies
@@ -128,7 +127,7 @@ end
 
 %% Plot average RMS sound pressure level in waveguide for every frequency
 figure(1)
-plot(freq,10*log10(L_P_average_dB(:,1:length(freq))),'LineWidth', 2, 'DisplayName',['Z/Z0 = ',num2str(1/beta(1)/Z0,'%0.0f')])
+plot(freq,L_P_average_dB(:,1:length(freq)),'LineWidth', 2, 'DisplayName',['Z/Z0 = ',num2str(1/beta(1)/Z0,'%0.0f')])
 hold on
 title_1 = [''];
 if (model_Z_by_alpha)
@@ -138,4 +137,4 @@ else
 end
 title({title_1;title_2})
 xlabel('Frequency in Hz','fontweight','bold','fontsize',11);
-ylabel('average RMS sound pressure level in waveguide in dB','fontweight','bold','fontsize',11);
+ylabel('mean RMS sound pressure level in waveguide in dB','fontweight','bold','fontsize',11);
